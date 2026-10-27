@@ -1,0 +1,318 @@
+<!DOCTYPE html><html lang="zh-Hant"> <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Build A Multi-node K3S Cluster With Windows 11 WSL2 | TJ Jiang</title><meta name="description" content="Build A Multi-node K3S Cluster With Windows 11 WSL2"><script>
+      // 進頁面立即套主題，避免閃爍：localStorage 優先，其次系統偏好
+      const saved = localStorage.getItem('theme');
+      document.documentElement.dataset.theme =
+        saved ?? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    </script><style>:root{--color-bg: #ffffff;--color-text: #1a202c;--color-muted: #64748b;--color-accent: #2563eb;--color-surface: #f1f5f9;--color-border: #e2e8f0;--font-body: system-ui, "Noto Sans TC", "PingFang TC", sans-serif;--font-mono: ui-monospace, "Cascadia Code", "Courier New", monospace;--radius: 8px;--content-width: 46rem}:root[data-theme=dark]{--color-bg: #0f172a;--color-text: #e2e8f0;--color-muted: #94a3b8;--color-accent: #60a5fa;--color-surface: #1e293b;--color-border: #334155}*{box-sizing:border-box}body{margin:0;background:var(--color-bg);color:var(--color-text);font-family:var(--font-body);line-height:1.7}a{color:var(--color-accent);text-decoration:none}a:hover{text-decoration:underline}main{max-width:var(--content-width);margin:0 auto;padding:2rem 1rem 4rem}code,pre{font-family:var(--font-mono)}pre{background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius);padding:1rem;overflow-x:auto}img{max-width:100%;height:auto}time{color:var(--color-muted);font-size:.875rem}.site-header{display:flex;align-items:center;gap:1.5rem;flex-wrap:wrap;padding:.75rem 1rem;border-bottom:1px solid var(--color-border)}.site-header .site-title{font-weight:700;color:var(--color-text)}.site-header nav{display:flex;gap:1rem;flex:1}.site-header nav a[aria-current=page]{font-weight:700}.site-footer{display:flex;gap:1rem;justify-content:space-between;flex-wrap:wrap;padding:1rem;border-top:1px solid var(--color-border);color:var(--color-muted)}.site-footer ul{display:flex;gap:1rem;list-style:none;margin:0;padding:0}#theme-toggle{background:var(--color-surface);color:var(--color-text);border:1px solid var(--color-border);border-radius:var(--radius);padding:.25rem .6rem;cursor:pointer}.tags{display:flex;gap:.5rem;list-style:none;margin:.5rem 0;padding:0;flex-wrap:wrap}.post-list{list-style:none;padding:0}.post-list li{padding:.75rem 0;border-bottom:1px solid var(--color-border)}.post-list p{margin:.25rem 0 0;color:var(--color-muted)}.pagination{display:flex;gap:1rem;justify-content:center;margin-top:2rem}.docs-grid{display:grid;grid-template-columns:14rem 1fr;gap:2rem}.docs-sidebar ul{list-style:none;padding:0}@media(max-width:48rem){.docs-grid{grid-template-columns:1fr}}main.wide{max-width:72rem}
+</style></head> <body> <header class="site-header"> <a class="site-title" href="/">TJ Jiang</a> <nav> <a href="/">首頁</a><a href="/blog/">部落格</a><a href="/portfolio/">作品集</a><a href="/docs/">文件</a> </nav> <button id="theme-toggle" aria-label="切換亮暗模式">◐</button> <script>
+  document.getElementById('theme-toggle').addEventListener('click', () => {
+    const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+    document.documentElement.dataset.theme = next;
+    localStorage.setItem('theme', next);
+  });
+</script> </header> <main> <article> <header> <h1>Build A Multi-node K3S Cluster With Windows 11 WSL2</h1> <time datetime="2026-07-25T00:00:00.000Z">2026-07-25</time> <ul class="tags"> <li><a href="/blog/tags/DevOps/">#DevOps</a></li><li><a href="/blog/tags/Infrastructure/">#Infrastructure</a></li><li><a href="/blog/tags/Windows/">#Windows</a></li><li><a href="/blog/tags/WSL/">#WSL</a></li><li><a href="/blog/tags/Kubernetes/">#Kubernetes</a></li> </ul> </header> <h1 id="background">Background</h1>
+<p>I’d like to have a kubernetes cluster, either for routine tasks or for practice. However, the cost of a kubernetes cluster on public clouds is often high for development (before formal deployments). Besides, I’d like to have a Apache Spark cluster for data processing (move data from on-premise to public cloud), and therefore an on-premise kubernetes cluster to achieve these goals is preferred.</p>
+<h1 id="prerequistes">Prerequistes</h1>
+<ul>
+<li>Windows 11</li>
+<li>A On-premise Network, with at least two computers.</li>
+<li>A common storage (samba shared drive is used here)</li>
+</ul>
+<h1 id="steps">Steps</h1>
+<h2 id="enable-wsl-2-and-create-a-hyper-v-bridged-network-adapter">Enable WSL 2 And Create a Hyper-V Bridged Network Adapter</h2>
+<ul>
+<li>
+<p>Hyper-V and WSL is enabled installed in Windows 11 (search in <code>settings</code> for <code>add Windows features</code>)</p>
+</li>
+<li>
+<p>in Powershell:</p>
+<ul>
+<li>
+<p>Run <code>wsl --update</code> to install and update WSL.</p>
+</li>
+<li>
+<p>Run <code>Get-NetAdapter | Sort-Object Name</code> to get all names of network interfaces.</p>
+</li>
+<li>
+<p>Choose one of your network adapters, get its name, and run:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="powershell"><code><span class="line"><span style="color:#79B8FF">New-VMSwitch</span><span style="color:#F97583"> -</span><span style="color:#E1E4E8">Name </span><span style="color:#9ECBFF">"WSLBridge"</span><span style="color:#F97583"> -</span><span style="color:#E1E4E8">NetAdapterName </span><span style="color:#9ECBFF">"乙太網路"</span><span style="color:#F97583"> -</span><span style="color:#E1E4E8">AllowManagementOS </span><span style="color:#79B8FF">$true</span></span></code></pre>
+<p>where the value of <code>NetAdapterName</code> (<code>"乙太網路"</code> here) should be the name of your network adapter.</p>
+</li>
+<li>
+<p>Run <code>Get-VMSwitch</code> to check the status, and it should be something like:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="powershell"><code><span class="line"><span style="color:#E1E4E8">Name           SwitchType NetAdapterInterfaceDescription</span></span>
+<span class="line"><span style="color:#F97583">----</span><span style="color:#F97583">           ----------</span><span style="color:#F97583"> ------------------------------</span></span>
+<span class="line"><span style="color:#F97583">Default</span><span style="color:#F97583"> Switch</span><span style="color:#E1E4E8"> Internal</span></span>
+<span class="line"><span style="color:#E1E4E8">WSLBridge      External   Realtek PCIe GbE Family Controller</span></span></code></pre>
+</li>
+<li>
+<p>The WSLBridge would be your network adapter from now on. It has the same MAC address as your original network adapter.</p>
+</li>
+</ul>
+</li>
+<li>
+<p>Modify and copy the following .wslconfig texts and save as your %UserProfile%.wslconfig in Windows host:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>[wsl2]</span></span>
+<span class="line"><span>networkingMode=bridged</span></span>
+<span class="line"><span>vmSwitch=WSLBridge</span></span>
+<span class="line"><span>memory=30GB</span></span>
+<span class="line"><span>processors=12</span></span>
+<span class="line"><span>swap=15GB</span></span>
+<span class="line"><span>swapfile=R:\\temp\\wsl-swap.vhdx</span></span>
+<span class="line"><span>dnsTunneling=false</span></span>
+<span class="line"><span>nestedVirtualization=true</span></span>
+<span class="line"><span>ipv6=true</span></span>
+<span class="line"><span>dhcp=true</span></span>
+<span class="line"><span>localhostforwarding=true</span></span>
+<span class="line"><span>macAddress=00-15-5D-XX-XX-XX</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>[experimental]</span></span>
+<span class="line"><span>autoMemoryReclaim=dropCache</span></span>
+<span class="line"><span>hostAddressLoopback=true</span></span>
+<span class="line"><span>sparseVhd=true</span></span></code></pre>
+<p>where the macAddress might be better to have <code>00-15-5D</code> prefix to indicate it’s an virtual instance. <code>XX-XX-XX</code> might changed to what is close to the macaddress of your network adapter.</p>
+</li>
+<li>
+<p>Why not using <code>networkingMode=mirrored</code>? Because k3s forwards traffics using iptable, and in <code>networkingMode=mirrored</code> there is still standard L4 port forwarding, and mirrored networking mode only enable the <strong>listening ports</strong> not being interfered by port forwards.</p>
+</li>
+<li>
+<p>Prepare the following text file to be saved as your <code>/etc/wsl.conf</code> in WSL:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>[network]</span></span>
+<span class="line"><span>generateResolvConf=false</span></span>
+<span class="line"><span>hostname=somehostname-wsl</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>[boot]</span></span>
+<span class="line"><span>systemd=true</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>[gpu]</span></span>
+<span class="line"><span>enabled=true</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>[interop]</span></span>
+<span class="line"><span>enabled=true</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>[time]</span></span>
+<span class="line"><span>useWindowsTimezone=true</span></span></code></pre>
+<p>where hostname can be changed to your preferred one.</p>
+</li>
+</ul>
+<h2 id="installation-on-k3s-master-node-control-plane">Installation on K3S Master Node (control-plane)</h2>
+<ul>
+<li>
+<p>Install the node to act as <strong>BOTH</strong> a master (control-plane) and a worker node:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">curl</span><span style="color:#79B8FF"> -sfL</span><span style="color:#9ECBFF"> https://get.k3s.io</span><span style="color:#F97583"> |</span><span style="color:#B392F0"> sh</span><span style="color:#9ECBFF"> -</span></span></code></pre>
+</li>
+<li>
+<p>Get the cluster token and IP:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">sudo</span><span style="color:#9ECBFF"> cat</span><span style="color:#9ECBFF"> /var/lib/rancher/k3s/server/node-token</span></span></code></pre>
+</li>
+<li>
+<p>Install the node to act as master node only:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">curl</span><span style="color:#79B8FF"> -sfL</span><span style="color:#9ECBFF"> https://get.k3s.io</span><span style="color:#F97583"> |</span><span style="color:#B392F0"> sh</span><span style="color:#79B8FF"> -s</span><span style="color:#9ECBFF"> -</span><span style="color:#9ECBFF"> server</span><span style="color:#79B8FF"> --node-taint</span><span style="color:#9ECBFF"> CriticalAddonsOnly=</span><span style="color:#79B8FF">true</span><span style="color:#9ECBFF">:NoSchedule</span></span></code></pre>
+</li>
+</ul>
+<h2 id="installation-on-k3s-worker-node">Installation on K3S Worker Node</h2>
+<ul>
+<li>Run the following command in WSL of the worker node:</li>
+</ul>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">curl</span><span style="color:#79B8FF"> -sfL</span><span style="color:#9ECBFF"> https://get.k3s.io</span><span style="color:#F97583"> |</span><span style="color:#E1E4E8"> K3S_URL</span><span style="color:#F97583">=</span><span style="color:#9ECBFF">https://[IP</span><span style="color:#E1E4E8">]:[PORT] K3S_TOKEN</span><span style="color:#F97583">=</span><span style="color:#9ECBFF">k3stoken</span><span style="color:#B392F0"> sh</span><span style="color:#9ECBFF"> -</span></span></code></pre>
+<p>where the <code>k3stoken</code> come from previous step in k3s cluter master node installation, or if you forget it, you may use <code>sudo cat /var/lib/rancher/k3s/server/token</code> to find out; and the <code>PORT</code> can be found in previous steps, or with <code>sudo ss -tulpn | grep k3s</code>. <code>IP</code> should be the network IP address of the master node of K3s cluster.</p>
+<ul>
+<li>
+<p>If typo or mistakes happened, you may check the variables through:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">sudo</span><span style="color:#9ECBFF"> cat</span><span style="color:#9ECBFF"> /etc/systemd/system/k3s-agent.service.env</span></span></code></pre>
+<p>it will outputs something like:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#E1E4E8">K3S_TOKEN</span><span style="color:#F97583">=</span><span style="color:#9ECBFF">'[K3S_token]'</span></span>
+<span class="line"><span style="color:#E1E4E8">K3S_URL</span><span style="color:#F97583">=</span><span style="color:#9ECBFF">'https://[IP]:6443'</span></span></code></pre>
+</li>
+</ul>
+<h2 id="check-running-status-of-the-cluster-and-debug">Check Running Status of the Cluster and Debug</h2>
+<ul>
+<li>
+<p>Run the command on master node:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">kubectl</span><span style="color:#9ECBFF"> describe</span><span style="color:#9ECBFF"> node</span></span></code></pre>
+<p>to check if worker node successfully joined the cluster.</p>
+</li>
+</ul>
+<h2 id="configure-the-cluster---install-headlamp">Configure the Cluster - Install Headlamp</h2>
+<ul>
+<li>
+<p>Follow the installation guides on <a href="https://headlamp.dev/docs/latest/installation/in-cluster/#using-helm">installing headlamp using Helm</a>.</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">helm</span><span style="color:#9ECBFF"> repo</span><span style="color:#9ECBFF"> add</span><span style="color:#9ECBFF"> headlamp</span><span style="color:#9ECBFF"> https://kubernetes-sigs.github.io/headlamp/</span></span>
+<span class="line"><span style="color:#B392F0">helm</span><span style="color:#9ECBFF"> install</span><span style="color:#9ECBFF"> my-headlamp</span><span style="color:#9ECBFF"> headlamp/headlamp</span><span style="color:#79B8FF"> --namespace</span><span style="color:#9ECBFF"> kube-system</span></span></code></pre>
+</li>
+<li>
+<p>After installation, create an Ingress to forward traffics to headlamp.
+If there is a DNS record pointing to master WSL, create an YAML:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>apiVersion: networking.k8s.io/v1</span></span>
+<span class="line"><span>kind: Ingress</span></span>
+<span class="line"><span>metadata:</span></span>
+<span class="line"><span>  name: headlamp</span></span>
+<span class="line"><span>  namespace: kube-system</span></span>
+<span class="line"><span>spec:</span></span>
+<span class="line"><span>  ingressClassName: traefik</span></span>
+<span class="line"><span>  rules:</span></span>
+<span class="line"><span>  - host: headlamp.example.com</span></span>
+<span class="line"><span>    http:</span></span>
+<span class="line"><span>      paths:</span></span>
+<span class="line"><span>      - path: /</span></span>
+<span class="line"><span>        pathType: Prefix</span></span>
+<span class="line"><span>        backend:</span></span>
+<span class="line"><span>          service:</span></span>
+<span class="line"><span>            name: my-headlamp</span></span>
+<span class="line"><span>            port:</span></span>
+<span class="line"><span>              number: 80</span></span></code></pre>
+<p>or in scenerios without DNS record:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>spec:</span></span>
+<span class="line"><span>  ingressClassName: traefik</span></span>
+<span class="line"><span>  rules:</span></span>
+<span class="line"><span>  - http:</span></span>
+<span class="line"><span>      paths:</span></span>
+<span class="line"><span>      - path: /headlamp</span></span>
+<span class="line"><span>        pathType: Prefix</span></span>
+<span class="line"><span>        backend:</span></span>
+<span class="line"><span>          service:</span></span>
+<span class="line"><span>            name: my-headlamp</span></span>
+<span class="line"><span>            port:</span></span>
+<span class="line"><span>              number: 80</span></span></code></pre>
+<p>Then <code>kubectl apply -f [YAML_FILE]</code>. After <code>kubeclt apply</code>, visit http://&#x3C;MASTER_WSL_IP>/headlamp</p>
+</li>
+</ul>
+<h2 id="configure-the-cluster---workload-shares">Configure the Cluster - Workload Shares</h2>
+<ul>
+<li>
+<p>If there is a node among the two (No1 and No2) which you would like it to share more workloads, label the two nodes first:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="bash"><code><span class="line"><span style="color:#B392F0">kubectl</span><span style="color:#9ECBFF"> label</span><span style="color:#9ECBFF"> node</span><span style="color:#9ECBFF"> No2</span><span style="color:#9ECBFF"> workload=preferred</span></span>
+<span class="line"><span style="color:#B392F0">kubectl</span><span style="color:#9ECBFF"> label</span><span style="color:#9ECBFF"> node</span><span style="color:#9ECBFF"> No1</span><span style="color:#9ECBFF"> workload=backup</span></span></code></pre>
+</li>
+<li>
+<p>you can set <code>nodeAffinity</code>, <code>podAffinity</code>, <code>podAntiAffinity</code>, <code>topologySpreadConstraints</code>
+Example deployment:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="yaml"><code><span class="line"><span style="color:#85E89D">apiVersion</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">apps/v1</span></span>
+<span class="line"><span style="color:#85E89D">kind</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">Deployment</span></span>
+<span class="line"><span style="color:#85E89D">metadata</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">my-app</span></span>
+<span class="line"><span style="color:#85E89D">spec</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">  replicas</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">5</span></span>
+<span class="line"><span style="color:#85E89D">  template</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">    spec</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">      affinity</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">        nodeAffinity</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">          preferredDuringSchedulingIgnoredDuringExecution</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">      </span></span>
+<span class="line"><span style="color:#6A737D">          # Primary preference</span></span>
+<span class="line"><span style="color:#E1E4E8">          - </span><span style="color:#85E89D">weight</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">100</span></span>
+<span class="line"><span style="color:#85E89D">            preference</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">              matchExpressions</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">              - </span><span style="color:#85E89D">key</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">workload</span></span>
+<span class="line"><span style="color:#85E89D">                operator</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">In</span></span>
+<span class="line"><span style="color:#85E89D">                values</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">                - </span><span style="color:#9ECBFF">preferred</span></span>
+<span class="line"><span style="color:#E1E4E8">      </span></span>
+<span class="line"><span style="color:#6A737D">          # Secondary preference</span></span>
+<span class="line"><span style="color:#E1E4E8">          - </span><span style="color:#85E89D">weight</span><span style="color:#E1E4E8">: </span><span style="color:#79B8FF">50</span></span>
+<span class="line"><span style="color:#85E89D">            preference</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#85E89D">              matchExpressions</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">              - </span><span style="color:#85E89D">key</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">workload</span></span>
+<span class="line"><span style="color:#85E89D">                operator</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">In</span></span>
+<span class="line"><span style="color:#85E89D">                values</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">                - </span><span style="color:#9ECBFF">backup</span></span>
+<span class="line"></span>
+<span class="line"><span style="color:#85E89D">      containers</span><span style="color:#E1E4E8">:</span></span>
+<span class="line"><span style="color:#E1E4E8">      - </span><span style="color:#85E89D">name</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">app</span></span>
+<span class="line"><span style="color:#85E89D">        image</span><span style="color:#E1E4E8">: </span><span style="color:#9ECBFF">nginx</span></span></code></pre>
+</li>
+</ul>
+<h2 id="configure-the-cluster---common-storage">Configure the Cluster - Common Storage</h2>
+<h3 id="create-secrets-for-samba-access">Create Secrets For Samba Access</h3>
+<ul>
+<li>smb-storage-secrets.yml
+example:
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>apiVersion: v1</span></span>
+<span class="line"><span>kind: Secret</span></span>
+<span class="line"><span>metadata:</span></span>
+<span class="line"><span>  name: cifs-csi-credentials # 必須與你 StorageClass 設定的名稱一致</span></span>
+<span class="line"><span>  namespace: default         # 必須與你 StorageClass 設定的命名空間一致</span></span>
+<span class="line"><span>type: Opaque</span></span>
+<span class="line"><span>data:</span></span>
+<span class="line"><span>  username: testusername # 貼上你帳號的 Base64 編碼</span></span>
+<span class="line"><span>  password: testpassword # 貼上你密碼的 Base64 編碼</span></span></code></pre>
+</li>
+</ul>
+<h3 id="samba-storage-class">Samba Storage Class</h3>
+<ul>
+<li>Install the SMB CSI driver for Kubernetes from <a href="https://github.com/kubernetes-csi/csi-driver-smb">here</a> first.</li>
+<li>Then create a SMB CSI storage class with examples from <a href="https://github.com/kubernetes-csi/csi-driver-smb/blob/master/deploy/example/e2e_usage.md">here</a>.</li>
+<li>smb-with-subpath-storageclass.yml
+Example:
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>apiVersion: storage.k8s.io/v1</span></span>
+<span class="line"><span>kind: StorageClass</span></span>
+<span class="line"><span>metadata:</span></span>
+<span class="line"><span>  name: smb-with-subpath</span></span>
+<span class="line"><span>provisioner: smb.csi.k8s.io # 確保您已安裝 smb.csi.k8s.io 驅動程式</span></span>
+<span class="line"><span>parameters:</span></span>
+<span class="line"><span>  source: "//[IP_OF_SAMBA_HOST]/[SHARED_DRIVE_NAME]" </span></span>
+<span class="line"><span>  csi.storage.k8s.io/provisioner-secret-name: "cifs-csi-credentials"</span></span>
+<span class="line"><span>  csi.storage.k8s.io/provisioner-secret-namespace: "default"</span></span>
+<span class="line"><span>  csi.storage.k8s.io/node-stage-secret-name: "cifs-csi-credentials"</span></span>
+<span class="line"><span>  csi.storage.k8s.io/node-stage-secret-namespace: "default"</span></span>
+<span class="line"><span>reclaimPolicy: Delete</span></span>
+<span class="line"><span>volumeBindingMode: Immediate</span></span>
+<span class="line"><span>allowVolumeExpansion: true</span></span>
+<span class="line"><span>mountOptions:</span></span>
+<span class="line"><span>  - dir_mode=0777</span></span>
+<span class="line"><span>  - file_mode=0777</span></span>
+<span class="line"><span>  - uid=8787</span></span>
+<span class="line"><span>  - gid=68787</span></span>
+<span class="line"><span>  - noperm</span></span>
+<span class="line"><span>  - mfsymlinks</span></span>
+<span class="line"><span>  - cache=strict</span></span>
+<span class="line"><span>  - noserverino  # required to prevent data corruption</span></span></code></pre>
+</li>
+</ul>
+<h3 id="create-a-persistent-volume-claimpersistent-volume">Create A Persistent Volume Claim/Persistent Volume</h3>
+<ul>
+<li>
+<p>persistentVolumeClaim.yml
+Example:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>apiVersion: v1</span></span>
+<span class="line"><span>kind: PersistentVolumeClaim</span></span>
+<span class="line"><span>metadata:</span></span>
+<span class="line"><span>  name: smb-pvc-k8s</span></span>
+<span class="line"><span>  namespace: default</span></span>
+<span class="line"><span>spec:</span></span>
+<span class="line"><span>  accessModes:</span></span>
+<span class="line"><span>    - ReadWriteMany</span></span>
+<span class="line"><span>  resources:</span></span>
+<span class="line"><span>    requests:</span></span>
+<span class="line"><span>      storage: 10Gi</span></span>
+<span class="line"><span>  storageClassName: smb-with-subpath   # bind via StorageClass</span></span>
+<span class="line"><span>  volumeName: smb-pv-k8s                        # explicitly bind to PV</span></span></code></pre>
+</li>
+<li>
+<p>Persistent Volume: persistentVolume.yml
+Example:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>apiVersion: v1</span></span>
+<span class="line"><span>kind: PersistentVolume</span></span>
+<span class="line"><span>metadata:</span></span>
+<span class="line"><span>  name: smb-pv-k8s</span></span>
+<span class="line"><span>spec:</span></span>
+<span class="line"><span>  capacity:</span></span>
+<span class="line"><span>    storage: 10Gi</span></span>
+<span class="line"><span>  accessModes:</span></span>
+<span class="line"><span>    - ReadWriteMany</span></span>
+<span class="line"><span>  storageClassName: smb-with-subpath   # use your StorageClass</span></span>
+<span class="line"><span>  persistentVolumeReclaimPolicy: Retain</span></span>
+<span class="line"><span>  csi:</span></span>
+<span class="line"><span>    driver: smb.csi.k8s.io</span></span>
+<span class="line"><span>    volumeHandle: smb-pv-k8s   # unique identifier</span></span>
+<span class="line"><span>    volumeAttributes:</span></span>
+<span class="line"><span>      source: "//[IP_OF_SAMBA_HOST]/[SHARED_DRIVE_NAME]/k8s"   # direct path to your share</span></span>
+<span class="line"><span>    nodeStageSecretRef:</span></span>
+<span class="line"><span>      name: cifs-csi-credentials</span></span>
+<span class="line"><span>      namespace: default</span></span></code></pre>
+</li>
+</ul>
+<h2 id="start-wsl-at-boot-to-activate-k3s-cluster---failed">Start WSL at Boot To Activate K3S Cluster - Failed</h2>
+<ul>
+<li><a href="https://github.com/microsoft/WSL/issues/9231">Refer to this discussion</a></li>
+</ul> </article> </main> <footer class="site-footer"> <p>© 2026 TJ Jiang</p> <ul> <li><a href="https://github.com/tingjhenjiang">GitHub</a></li> </ul> <p>powered by <a href="https://astro.build/">Astro</a> and <a href="https://quarto.org/">Quarto</a></p> </footer> </body></html>
