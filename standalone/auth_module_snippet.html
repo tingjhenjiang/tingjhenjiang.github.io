@@ -1,0 +1,1318 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>pythonportal — Auth &amp; RBAC Architecture Diagram</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"
+    integrity="sha384-ZZ1pncU3bQe8y31yfZdMFdSpttDoPmOZg2wguVK9almUodir1PghgT0eY7Mrty8H"
+    crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"
+    integrity="sha384-en/ztfPSRkGfME4KIm05joYXynqzUgbsG5nMrj/xEFAHXkeZfO3yMK8QQ+mP7p1/"
+    crossorigin="anonymous"></script>
+  <style>
+    :root {
+      --bg-canvas: #020617;
+      --bg-card: #0b1224;
+      --bg-panel: #0f172a;
+      --border-subtle: #334155;
+      --text-primary: #f8fafc;
+      --text-secondary: #cbd5e1;
+      --text-muted: #94a3b8;
+      --cyan: #38bdf8;
+      --emerald: #34d399;
+      --violet: #c084fc;
+      --amber: #fbbf24;
+      --rose: #fb7185;
+      --orange: #fb923c;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--bg-canvas);
+      color: var(--text-primary);
+      font-family: 'JetBrains Mono', 'Noto Sans TC', monospace, sans-serif;
+      min-height: 100vh;
+      padding: 28px 24px 40px;
+      line-height: 1.5;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+      margin-bottom: 18px;
+      flex-wrap: wrap;
+    }
+
+    .title-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .title-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .pulse-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--emerald);
+      box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.7);
+      animation: pulse 2s infinite;
+      flex-shrink: 0;
+    }
+
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.7); }
+      70% { box-shadow: 0 0 0 10px rgba(52, 211, 153, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0); }
+    }
+
+    h1 {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--text-primary);
+      letter-spacing: -0.02em;
+    }
+
+    .subtitle {
+      font-size: 13px;
+      color: var(--text-secondary);
+    }
+
+    .subtitle code {
+      color: var(--cyan);
+      background: rgba(56, 189, 248, 0.14);
+      padding: 1px 6px;
+      border-radius: 4px;
+    }
+
+    /* Controls & Export Toolbar */
+    .header-controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .flow-filters {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .flow-btn {
+      background: #0f172a;
+      color: var(--text-secondary);
+      border: 1px solid #475569;
+      border-radius: 6px;
+      padding: 6px 11px;
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.18s ease;
+    }
+
+    .flow-btn:hover {
+      border-color: var(--cyan);
+      color: var(--text-primary);
+    }
+
+    .flow-btn.active {
+      background: rgba(56, 189, 248, 0.22);
+      border-color: var(--cyan);
+      color: #ffffff;
+      box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.4);
+    }
+
+    .toolbar {
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .toolbar-actions {
+      display: none;
+      align-items: center;
+      gap: 6px;
+      background: #0f172a;
+      border: 1px solid #475569;
+      border-radius: 8px;
+      padding: 4px;
+    }
+
+    .toolbar.open .toolbar-actions {
+      display: flex;
+    }
+
+    .toolbar-btn, .toolbar-toggle {
+      background: #0f172a;
+      color: var(--text-primary);
+      border: 1px solid #475569;
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .toolbar-btn:hover, .toolbar-toggle:hover {
+      background: #1e293b;
+      border-color: var(--cyan);
+    }
+
+    .toolbar-toggle {
+      font-size: 16px;
+      line-height: 1;
+      padding: 6px 12px;
+    }
+
+    /* Main Diagram Card */
+    .diagram-card {
+      background: var(--bg-card);
+      border: 1.5px solid var(--border-subtle);
+      border-radius: 14px;
+      padding: 14px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .diagram-stage {
+      width: 100%;
+      overflow-x: auto;
+    }
+
+    svg#arch-svg {
+      width: 100%;
+      min-width: 1040px;
+      height: auto;
+      display: block;
+      border-radius: 10px;
+    }
+
+    /* Interactive SVG Node States */
+    .node {
+      cursor: pointer;
+      transition: opacity 0.2s ease, filter 0.2s ease;
+    }
+
+    .node:hover {
+      filter: brightness(1.16) drop-shadow(0 0 8px rgba(56, 189, 248, 0.35));
+    }
+
+    .node.selected rect.node-stroke {
+      stroke-width: 2.6px;
+      filter: drop-shadow(0 0 10px rgba(248, 250, 252, 0.45));
+    }
+
+    .dimmed {
+      opacity: 0.16 !important;
+    }
+
+    .flow-edge {
+      transition: opacity 0.2s ease, stroke-width 0.2s ease;
+    }
+
+    .flow-edge.highlighted {
+      opacity: 1 !important;
+      stroke-width: 2.6px !important;
+    }
+
+    .svc-icon-wrap {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(248, 250, 252, 0.96);
+      border-radius: 8px;
+      padding: 4px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+    }
+
+    .svc-icon-wrap img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+    }
+
+    /* Inspector Panel */
+    .inspector {
+      margin-top: 14px;
+      background: #0f172a;
+      border: 1.5px solid #475569;
+      border-left: 4px solid var(--cyan);
+      border-radius: 10px;
+      padding: 14px 18px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+
+    .inspector-main {
+      flex: 1 1 620px;
+    }
+
+    .inspector-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: #ffffff;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .inspector-badge {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: rgba(56, 189, 248, 0.2);
+      color: #7dd3fc;
+      border: 1px solid rgba(56, 189, 248, 0.5);
+    }
+
+    .inspector-desc {
+      font-size: 12.5px;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+    }
+
+    .inspector-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .meta-chip {
+      font-size: 11.5px;
+      color: #f8fafc;
+      background: #1e293b;
+      border: 1px solid #475569;
+      padding: 3px 9px;
+      border-radius: 6px;
+    }
+
+    /* Summary Cards */
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-top: 18px;
+    }
+
+    @media (max-width: 960px) {
+      .cards-grid { grid-template-columns: 1fr; }
+    }
+
+    .card {
+      background: var(--bg-panel);
+      border: 1.5px solid var(--border-subtle);
+      border-radius: 12px;
+      padding: 16px 18px;
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .card-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .card-dot.emerald { background: var(--emerald); }
+    .card-dot.violet { background: var(--violet); }
+    .card-dot.rose { background: var(--rose); }
+
+    .card h3 {
+      font-size: 14px;
+      font-weight: 700;
+      color: #ffffff;
+    }
+
+    .card ul {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+    }
+
+    .card li {
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    .card li strong {
+      color: #ffffff;
+    }
+
+    /* Footer */
+    .footer {
+      margin-top: 18px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      font-size: 11.5px;
+      color: var(--text-muted);
+      border-top: 1px solid #1e293b;
+      padding-top: 12px;
+    }
+
+    @media print {
+      .toolbar, .flow-filters { display: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <div id="report-container" class="container">
+    <!-- Header -->
+    <header class="header">
+      <div class="title-group">
+        <div class="title-row">
+          <div class="pulse-dot"></div>
+          <h1>pythonportal — Auth &amp; Dynamic RBAC Architecture</h1>
+        </div>
+        <p class="subtitle">
+          Repo: <code>jp/pythonportal</code> · Modules: <code>src/auth/</code> &amp; <code>src/auth/admin/</code> · Hybrid GCP Cloud Run + On-Premises AD / Synology NAS
+        </p>
+      </div>
+
+      <div class="header-controls">
+        <div class="flow-filters" role="group" aria-label="流程篩選">
+          <button class="flow-btn active" data-flow="all">全部流程</button>
+          <button class="flow-btn" data-flow="login">1. 登入聚合</button>
+          <button class="flow-btn" data-flow="rbac">2. 即時 RBAC</button>
+          <button class="flow-btn" data-flow="admin">3. 管理與稽核</button>
+          <button class="flow-btn" data-flow="sync">4. 啟動與同步</button>
+        </div>
+
+        <div class="toolbar" id="export-toolbar">
+          <div class="toolbar-actions">
+            <button class="toolbar-btn" onclick="copyAsImage()" title="複製高解析度 PNG">📋 Copy</button>
+            <button class="toolbar-btn" onclick="downloadPNG()" title="下載 PNG">🖼️ PNG</button>
+            <button class="toolbar-btn" onclick="downloadPDF()" title="匯出單頁 PDF">📄 PDF</button>
+          </div>
+          <button class="toolbar-toggle" onclick="toggleToolbar()" aria-label="匯出選單">⋯</button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Diagram -->
+    <main class="diagram-card">
+      <div class="diagram-stage">
+        <svg id="arch-svg" viewBox="0 0 1320 920" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <!-- Subtle Dark Grid -->
+            <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+              <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" stroke-width="0.7" />
+            </pattern>
+
+            <!-- High-Contrast Arrowheads -->
+            <marker id="arrow-cyan" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+              <polygon points="0 0, 10 3.5, 0 7" fill="#38bdf8" />
+            </marker>
+            <marker id="arrow-emerald" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+              <polygon points="0 0, 10 3.5, 0 7" fill="#34d399" />
+            </marker>
+            <marker id="arrow-violet" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+              <polygon points="0 0, 10 3.5, 0 7" fill="#c084fc" />
+            </marker>
+            <marker id="arrow-amber" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+              <polygon points="0 0, 10 3.5, 0 7" fill="#fbbf24" />
+            </marker>
+            <marker id="arrow-rose" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+              <polygon points="0 0, 10 3.5, 0 7" fill="#fb7185" />
+            </marker>
+            <marker id="arrow-orange" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+              <polygon points="0 0, 10 3.5, 0 7" fill="#fb923c" />
+            </marker>
+          </defs>
+
+          <!-- Canvas Background -->
+          <rect width="1320" height="920" fill="#020617" />
+          <rect width="1320" height="920" fill="url(#grid)" />
+
+          <!-- ========================================================= -->
+          <!-- BOUNDARY BOXES (Rendered behind arrows & nodes)           -->
+          <!-- ========================================================= -->
+
+          <!-- GCP Service Project Boundary -->
+          <rect x="30" y="150" width="880" height="640" rx="12"
+            fill="rgba(120, 53, 15, 0.12)" stroke="#fbbf24" stroke-width="1.8" stroke-dasharray="8,4" />
+          <text x="48" y="175" fill="#fde68a" font-size="13" font-weight="700">
+            GCP Service Project — jp (asia-east1)
+          </text>
+
+          <!-- Cloud Run Service Container -->
+          <rect x="52" y="196" width="542" height="422" rx="10"
+            fill="rgba(6, 78, 59, 0.16)" stroke="#34d399" stroke-width="1.6" stroke-dasharray="5,4" />
+          <foreignObject x="64" y="204" width="32" height="32">
+            <div xmlns="http://www.w3.org/1999/xhtml" class="svc-icon-wrap">
+              <img src="gcp-svg-icons/Serverless Computing/SVG/ServerlessComputing-512-color.svg" alt="Cloud Run" />
+            </div>
+          </foreignObject>
+          <text x="106" y="219" fill="#6ee7b7" font-size="12.5" font-weight="700">
+            Cloud Run v2 Service · FastAPI Backend (INGRESS_INTERNAL_ONLY)
+          </text>
+          <text x="106" y="234" fill="#cbd5e1" font-size="10">
+            Lifespan: JWT Secret → RBACCache Pre-warm → 10m Refresher → Connectivity Checks
+          </text>
+
+          <!-- GCP Shared VPC Host Project Boundary -->
+          <rect x="944" y="150" width="346" height="376" rx="12"
+            fill="rgba(8, 51, 68, 0.18)" stroke="#38bdf8" stroke-width="1.8" stroke-dasharray="8,4" />
+          <text x="960" y="175" fill="#7dd3fc" font-size="12.5" font-weight="700">
+            GCP Shared VPC Host (79)
+          </text>
+
+          <!-- On-Premises Corporate LAN Boundary -->
+          <rect x="944" y="556" width="346" height="234" rx="12"
+            fill="rgba(136, 19, 55, 0.18)" stroke="#fb7185" stroke-width="1.8" stroke-dasharray="6,4" />
+          <text x="960" y="581" fill="#fda4af" font-size="12.5" font-weight="700">
+            On-Premises Corporate LAN (Private)
+          </text>
+
+          <!-- ========================================================= -->
+          <!-- CONNECTION ARROWS (Drawn early so nodes mask overlaps)    -->
+          <!-- ========================================================= -->
+
+          <!-- 1. Frontend -> Auth Router (Login / Session) -->
+          <path class="flow-edge" data-flows="login rbac"
+            d="M 175 114 L 175 248"
+            fill="none" stroke="#38bdf8" stroke-width="2" marker-end="url(#arrow-cyan)" />
+
+          <!-- 2. Frontend -> Admin Router (Admin Panel API) -->
+          <path class="flow-edge" data-flows="admin rbac"
+            d="M 270 114 L 270 140 L 455 140 L 455 248"
+            fill="none" stroke="#38bdf8" stroke-width="2" marker-end="url(#arrow-cyan)" />
+
+          <!-- 3. Bootstrap CLI -> Firestore (Seed Mappings & Roles) -->
+          <path class="flow-edge" data-flows="sync"
+            d="M 980 76 L 758 76 L 758 196"
+            fill="none" stroke="#fb923c" stroke-width="2" stroke-dasharray="6,3" marker-end="url(#arrow-orange)" />
+
+          <!-- 4. Auth Router -> Auth Service -->
+          <path class="flow-edge" data-flows="login rbac"
+            d="M 192 318 L 192 358"
+            fill="none" stroke="#34d399" stroke-width="2" marker-end="url(#arrow-emerald)" />
+
+          <!-- 5. Admin Router -> Dynamic RBAC / Auth Service -->
+          <path class="flow-edge" data-flows="admin rbac"
+            d="M 336 294 L 312 294 L 312 390 L 310 390"
+            fill="none" stroke="#fb7185" stroke-width="1.8" stroke-dasharray="4,3" marker-end="url(#arrow-rose)" />
+
+          <!-- 6. Auth Service <-> RBACCache -->
+          <path class="flow-edge" data-flows="rbac sync"
+            d="M 310 395 L 336 395"
+            fill="none" stroke="#fb923c" stroke-width="2" marker-end="url(#arrow-orange)" />
+
+          <!-- 7. Auth Service -> Shared LDAP Client -->
+          <path class="flow-edge" data-flows="login"
+            d="M 192 432 L 192 472"
+            fill="none" stroke="#fb7185" stroke-width="2" stroke-dasharray="5,3" marker-end="url(#arrow-rose)" />
+
+          <!-- 8. Admin Router -> Shared LDAP Client (Directory Search) -->
+          <path class="flow-edge" data-flows="admin"
+            d="M 572 300 L 584 300 L 584 452 L 245 452 L 245 472"
+            fill="none" stroke="#fb7185" stroke-width="1.8" stroke-dasharray="5,3" marker-end="url(#arrow-rose)" />
+
+          <!-- 9. Auth Service & Admin Router -> Audit Logger -->
+          <path class="flow-edge" data-flows="login rbac admin"
+            d="M 275 432 L 275 456 L 454 456 L 454 472"
+            fill="none" stroke="#c084fc" stroke-width="1.8" marker-end="url(#arrow-violet)" />
+
+          <!-- 10. RBACCache & Auth Service <-> Firestore -->
+          <path class="flow-edge" data-flows="login rbac admin sync"
+            d="M 572 385 L 605 385 L 605 262 L 628 262"
+            fill="none" stroke="#c084fc" stroke-width="2.2" marker-end="url(#arrow-violet)" />
+
+          <!-- 11. Audit Logger -> Firestore (auth_audit_logs) -->
+          <path class="flow-edge" data-flows="login rbac admin"
+            d="M 572 508 L 614 508 L 614 295 L 628 295"
+            fill="none" stroke="#c084fc" stroke-width="1.8" stroke-dasharray="4,3" marker-end="url(#arrow-violet)" />
+
+          <!-- 12. Auth Service -> Secret Manager (JWT Signing Key) -->
+          <path class="flow-edge" data-flows="sync login"
+            d="M 594 416 L 628 416"
+            fill="none" stroke="#fb7185" stroke-width="2" stroke-dasharray="5,3" marker-end="url(#arrow-rose)" />
+
+          <!-- 13. Shared LDAP Client -> GCS Volume (Certbot chain.pem) -->
+          <path class="flow-edge" data-flows="login admin sync"
+            d="M 310 536 L 628 536"
+            fill="none" stroke="#fbbf24" stroke-width="1.8" stroke-dasharray="5,3" marker-end="url(#arrow-amber)" />
+
+          <!-- 14. Shared LDAP Client -> Shared VPC Secret Manager (auth_ldap_credentials) -->
+          <path class="flow-edge" data-flows="login admin sync"
+            d="M 594 218 L 918 218 L 918 236 L 968 236"
+            fill="none" stroke="#fb7185" stroke-width="2" stroke-dasharray="5,3" marker-end="url(#arrow-rose)" />
+
+          <!-- 15. Cloud Run -> Shared VPC Direct Egress -->
+          <path class="flow-edge" data-flows="login admin"
+            d="M 594 352 L 968 352"
+            fill="none" stroke="#38bdf8" stroke-width="2.2" marker-end="url(#arrow-cyan)" />
+
+          <!-- 16. Shared VPC Direct Egress -> WireGuard Gateway VM -->
+          <path class="flow-edge" data-flows="login admin"
+            d="M 1117 390 L 1117 424"
+            fill="none" stroke="#38bdf8" stroke-width="2.2" marker-end="url(#arrow-cyan)" />
+
+          <!-- 17. WireGuard Gateway VM -> Synology NAS (HTTPS POST) -->
+          <path class="flow-edge" data-flows="login"
+            d="M 1050 500 L 1050 598"
+            fill="none" stroke="#fb7185" stroke-width="2.2" marker-end="url(#arrow-rose)" />
+
+          <!-- 18. WireGuard Gateway VM -> Active Directory (LDAPS/StartTLS RO) -->
+          <path class="flow-edge" data-flows="login admin"
+            d="M 1185 500 L 1185 540 L 1278 540 L 1278 732 L 1265 732"
+            fill="none" stroke="#fb7185" stroke-width="2.2" stroke-dasharray="6,3" marker-end="url(#arrow-rose)" />
+
+          <!-- 19. Cloud Run Job -> Shared VPC Direct Egress (Deploy Gate) -->
+          <path class="flow-edge" data-flows="sync"
+            d="M 594 683 L 926 683 L 926 368 L 968 368"
+            fill="none" stroke="#fbbf24" stroke-width="1.8" stroke-dasharray="5,3" marker-end="url(#arrow-amber)" />
+
+          <!-- ========================================================= -->
+          <!-- NODES: ROW 1 (External Client & DevOps Bootstrap)         -->
+          <!-- ========================================================= -->
+
+          <!-- Frontend Client (Independent -> Rounded Box + Text) -->
+          <g class="node" data-id="frontend" data-flows="login rbac admin">
+            <rect x="40" y="36" width="280" height="78" rx="8" fill="#0f172a" />
+            <rect class="node-stroke" x="40" y="36" width="280" height="78" rx="8"
+              fill="rgba(8, 51, 68, 0.55)" stroke="#38bdf8" stroke-width="1.8" />
+            <text x="180" y="64" fill="#ffffff" font-size="13" font-weight="700" text-anchor="middle">
+              Staff Portal Frontend
+            </text>
+            <text x="180" y="83" fill="#bae6fd" font-size="10.5" text-anchor="middle">
+              Browser SPA · HttpOnly j_t Cookie
+            </text>
+            <text x="180" y="100" fill="#cbd5e1" font-size="9.5" text-anchor="middle">
+              Independent Client · HTTPS / No-Store Cache
+            </text>
+          </g>
+
+          <!-- Route Bootstrap CLI / CI-CD (GCP DevOps Icon) -->
+          <g class="node" data-id="bootstrap" data-flows="sync">
+            <rect x="980" y="36" width="310" height="78" rx="8" fill="#0f172a" />
+            <rect class="node-stroke" x="980" y="36" width="310" height="78" rx="8"
+              fill="rgba(120, 53, 15, 0.38)" stroke="#fb923c" stroke-width="1.8" />
+            <foreignObject x="994" y="53" width="44" height="44">
+              <div xmlns="http://www.w3.org/1999/xhtml" class="svc-icon-wrap">
+                <img src="gcp-svg-icons/DevOps/SVG/DevOps-512-color.svg" alt="GCP DevOps" />
+              </div>
+            </foreignObject>
+            <text x="1050" y="64" fill="#ffffff" font-size="12.5" font-weight="700">
+              CI/CD · bootstrap_routes.py
+            </text>
+            <text x="1050" y="82" fill="#fed7aa" font-size="10">
+              Route Discovery → auth_api_mappings
+            </text>
+            <text x="1050" y="99" fill="#cbd5e1" font-size="9.5">
+              Seeds admin / user / mail_admin + Orphan Cleanup
+            </text>
+          </g>
+
+          <!-- ========================================================= -->
+          <!-- NODES: INSIDE CLOUD RUN (Independent Python Submodules)   -->
+          <!-- ========================================================= -->
+
+          <!-- Auth Router -->
+          <g class="node" data-id="auth_router" data-flows="login rbac">
+            <rect x="74" y="248" width="236" height="70" rx="8" fill="#0f172a" />
+            <rect class="node-stroke" x="74" y="248" width="236" height="70" rx="8"
+              fill="rgba(6, 78, 59, 0.55)" stroke="#34d399" stroke-width="1.8" />
+            <text x="192" y="272" fill="#ffffff" font-size="12" font-weight="700" text-anchor="middle">
+              Auth Router (/auth/*)
+            </text>
+            <text x="192" y="290" fill="#a7f3d0" font-size="10" text-anchor="middle">
+              /login · /me · /renew · /logout
+            </text>
+            <text x="192" y="306" fill="#cbd5e1" font-size="9.5" text-anchor="middle">
+              src/auth/router.py · /session-status
+            </text>
+          </g>
+
+          <!-- Auth Admin Router -->
+          <g class="node" data-id="admin_router" data-flows="admin rbac">
+            <rect x="336" y="248" width="236" height="70" rx="8" fill="#0f172a" />
+            <rect class="node-stroke" x="336" y="248" width="236" height="70" rx="8"
+              fill="rgba(6, 78, 59, 0.55)" stroke="#34d399" stroke-width="1.8" />
+            <text x="454" y="272" fill="#ffffff" font-size="12" font-weight="700" text-anchor="middle">
+              Admin Panel (/admin/auth/*)
+            </text>
+            <text x="454" y="290" fill="#a7f3d0" font-size="10" text-anchor="middle">
+              Roles · Groups · Users · Audit · Dir
+            </text>
+            <text x="454" y="306" fill="#cbd5e1" font-size="9.5" text-anchor="middle">
+              src/auth/admin/ · Router-Level RBAC
+            </text>
+          </g>
+
+          <!-- Auth Service & DynamicPermissionChecker -->
+          <g class="node" data-id="auth_service" data-flows="login rbac admin sync">
+            <rect x="74" y="358" width="236" height="74" rx="8" fill="#0f172a" />
+            <rect class="node-stroke" x="74" y="358" width="236" height="74" rx="8"
+              fill="rgba(136, 19, 55, 0.50)" stroke="#fb7185" stroke-width="1.8" />
+            <text x="192" y="382" fill="#ffffff" font-size="12" font-weight="700" text-anchor="middle">
+              Auth Service &amp; Gatekeeper
+            </text>
+            <text x="192" y="400" fill="#fecdd3" font-size="10" text-anchor="middle">
+              HS256 JWT · DynamicPermissionChecker
+            </text>
+            <text x="192" y="418" fill="#cbd5e1" font-size="9.5" text-anchor="middle">
+              Break-Glass · Implicit Deny · Role Merge
+            </text>
+          </g>
+
+          <!-- In-Memory RBACCache -->
+          <g class="node" data-id="rbac_cache" data-flows="rbac admin sync">
+            <rect x="336" y="358" width="236" height="74" rx="8" fill="#0f172a" />
+            <rect class="node-stroke" x="336" y="358" width="236" height="74" rx="8"
+              fill="rgba(251, 146, 60, 0.25)" stroke="#fb923c" stroke-width="1.8" />
+            <text x="454" y="382" fill="#ffffff" font-size="12" font-weight="700" text-anchor="middle">
+              In-Memory RBACCache
+            </text>
+            <text x="454" y="400" fill="#fed7aa" font-size="10" text-anchor="middle">
+              Regex Mappings · Role Inheritance
+            </text>
+            <text x="454" y="418" fill="#cbd5e1" font-size="9.5" text-anchor="middle">
+              src/auth/cache.py · 10m Auto-Refresh
+            </text>
+          </g>
+
+          <!-- Shared LDAP Client -->
+          <g class="node" data-id="ldap_client" data-flows="login admin">
+            <rect x="74" y="472" width="236" height="74" rx="8" fill="#0f172a" />
+            <rect class="node-stroke" x="74" y="472" width="236" height="74" rx="8"
+              fill="rgba(30, 41, 59, 0.85)" stroke="#94a3b8" stroke-width="1.8" />
+            <text x="192" y="496" fill="#ffffff" font-size="12" font-weight="700" text-anchor="middle">
+              Shared LDAP Client (ldap3)
+            </text>
+            <text x="192" y="514" fill="#e2e8f0" font-size="10" text-anchor="middle">
+              4-Step TLS Ladder · IPv6-Preferred
+            </text>
+            <text x="192" y="532" fill="#cbd5e1" font-size="9.5" text-anchor="middle">
+              Per-Call Bind (No Pool) · 5s Timeout
+            </text>
+          </g>
+
+          <!-- Audit Logger -->
+          <g class="node" data-id="audit_logger" data-flows="login rbac admin">
+            <rect x="336" y="472" width="236" height="74" rx="8" fill="#0f172a" />
+            <rect class="node-stroke" x="336" y="472" width="236" height="74" rx="8"
+              fill="rgba(76, 29, 149, 0.50)" stroke="#c084fc" stroke-width="1.8" />
+            <text x="454" y="496" fill="#ffffff" font-size="12" font-weight="700" text-anchor="middle">
+              Audit Logger (audit.py)
+            </text>
+            <text x="454" y="514" fill="#e9d5ff" font-size="10" text-anchor="middle">
+              LOGIN · DENIED · ADMIN_CHANGE
+            </text>
+            <text x="454" y="532" fill="#cbd5e1" font-size="9.5" text-anchor="middle">
+              Atomic commit_with_audit · 730d TTL
+            </text>
+          </g>
+
+          <!-- Middleware Bar inside Cloud Run -->
+          <g class="node" data-id="middleware" data-flows="login rbac admin">
+            <rect x="74" y="570" width="498" height="32" rx="6" fill="#0f172a" />
+            <rect class="node-stroke" x="74" y="570" width="498" height="32" rx="6"
+              fill="rgba(30, 41, 59, 0.75)" stroke="#64748b" stroke-width="1.2" />
+            <text x="323" y="590" fill="#e2e8f0" font-size="10.5" font-weight="600" text-anchor="middle">
+              Middleware: NoStoreCacheControl · CORSMiddleware · BackendConnectionError Handler
+            </text>
+          </g>
+
+          <!-- Cloud Run Job (Integration Test Gate) -->
+          <g class="node" data-id="cloud_run_job" data-flows="sync">
+            <rect x="52" y="644" width="542" height="78" rx="8" fill="#0f172a" />
+            <rect class="node-stroke" x="52" y="644" width="542" height="78" rx="8"
+              fill="rgba(6, 78, 59, 0.35)" stroke="#34d399" stroke-width="1.6" />
+            <foreignObject x="68" y="661" width="44" height="44">
+              <div xmlns="http://www.w3.org/1999/xhtml" class="svc-icon-wrap">
+                <img src="gcp-svg-icons/Serverless Computing/SVG/ServerlessComputing-512-color.svg" alt="Cloud Run Job" />
+              </div>
+            </foreignObject>
+            <text x="126" y="672" fill="#ffffff" font-size="12.5" font-weight="700">
+              Cloud Run v2 Job · jp-integration-test
+            </text>
+            <text x="126" y="691" fill="#a7f3d0" font-size="10.5">
+              Deploy Integration Gate (scripts/integration_test.py)
+            </text>
+            <text x="126" y="708" fill="#cbd5e1" font-size="9.5">
+              Verifies Network, LDAP TLS &amp; MSSQL connectivity via Shared VPC + Certbot GCS Mount
+            </text>
+          </g>
+
+          <!-- ========================================================= -->
+          <!-- NODES: GCP MANAGED SERVICES (Service Project)             -->
+          <!-- ========================================================= -->
+
+          <!-- Cloud Firestore -->
+          <g class="node" data-id="firestore" data-flows="login rbac admin sync">
+            <rect x="630" y="196" width="258" height="148" rx="8" fill="#0f172a" />
+            <rect class="node-stroke" x="630" y="196" width="258" height="148" rx="8"
+              fill="rgba(76, 29, 149, 0.45)" stroke="#c084fc" stroke-width="1.8" />
+            <foreignObject x="644" y="210" width="44" height="44">
+              <div xmlns="http://www.w3.org/1999/xhtml" class="svc-icon-wrap">
+                <img src="gcp-svg-icons/Databases/SVG/Databases-512-color.svg" alt="Cloud Firestore" />
+              </div>
+            </foreignObject>
+            <text x="700" y="226" fill="#ffffff" font-size="12.5" font-weight="700">
+              Cloud Firestore (Native)
+            </text>
+            <text x="700" y="244" fill="#e9d5ff" font-size="10">
+              Prefix: {env}_auth_*
+            </text>
+            <text x="646" y="274" fill="#f8fafc" font-size="10">
+              • auth_sessions · auth_roles
+            </text>
+            <text x="646" y="292" fill="#f8fafc" font-size="10">
+              • auth_groups (ldap/portal)
+            </text>
+            <text x="646" y="310" fill="#f8fafc" font-size="10">
+              • auth_user_roles · auth_api_mappings
+            </text>
+            <text x="646" y="328" fill="#e9d5ff" font-size="10">
+              • auth_audit_logs (7 Indexes + TTL)
+            </text>
+          </g>
+
+          <!-- Secret Manager (JWT Signing Key) -->
+          <g class="node" data-id="secret_jwt" data-flows="sync login">
+            <rect x="630" y="376" width="258" height="82" rx="8" fill="#0f172a" />
+            <rect class="node-stroke" x="630" y="376" width="258" height="82" rx="8"
+              fill="rgba(136, 19, 55, 0.42)" stroke="#fb7185" stroke-width="1.8" />
+            <foreignObject x="644" y="395" width="44" height="44">
+              <div xmlns="http://www.w3.org/1999/xhtml" class="svc-icon-wrap">
+                <img src="gcp-svg-icons/Security Identity/SVG/SecurityIdentity-512-color.svg" alt="Secret Manager" />
+              </div>
+            </foreignObject>
+            <text x="700" y="406" fill="#ffffff" font-size="12" font-weight="700">
+              Secret Manager (JWT)
+            </text>
+            <text x="700" y="424" fill="#fecdd3" font-size="10">
+              auth_jwt_signing_key
+            </text>
+            <text x="700" y="441" fill="#cbd5e1" font-size="9.5">
+              Fetched at Lifespan Startup
+            </text>
+          </g>
+
+          <!-- Cloud Storage (Certbot TLS Volume) -->
+          <g class="node" data-id="gcs_certs" data-flows="login admin sync">
+            <rect x="630" y="492" width="258" height="84" rx="8" fill="#0f172a" />
+            <rect class="node-stroke" x="630" y="492" width="258" height="84" rx="8"
+              fill="rgba(120, 53, 15, 0.42)" stroke="#fbbf24" stroke-width="1.8" />
+            <foreignObject x="644" y="512" width="44" height="44">
+              <div xmlns="http://www.w3.org/1999/xhtml" class="svc-icon-wrap">
+                <img src="gcp-svg-icons/Storage/SVG/Storage-512-color.svg" alt="Cloud Storage" />
+              </div>
+            </foreignObject>
+            <text x="700" y="523" fill="#ffffff" font-size="12" font-weight="700">
+              Cloud Storage (GCS)
+            </text>
+            <text x="700" y="541" fill="#fde68a" font-size="10">
+              ldap-tls-certs (RO Mount)
+            </text>
+            <text x="700" y="558" fill="#cbd5e1" font-size="9.5">
+              Certbot chain.pem for LDAPS
+            </text>
+          </g>
+
+          <!-- Cloud IAM Service Account -->
+          <g class="node" data-id="iam_sa" data-flows="sync">
+            <rect x="630" y="610" width="258" height="86" rx="8" fill="#0f172a" />
+            <rect class="node-stroke" x="630" y="610" width="258" height="86" rx="8"
+              fill="rgba(120, 53, 15, 0.32)" stroke="#fbbf24" stroke-width="1.6" />
+            <foreignObject x="644" y="631" width="44" height="44">
+              <div xmlns="http://www.w3.org/1999/xhtml" class="svc-icon-wrap">
+                <img src="gcp-svg-icons/Security Identity/SVG/SecurityIdentity-512-color.svg" alt="Cloud IAM" />
+              </div>
+            </foreignObject>
+            <text x="700" y="641" fill="#ffffff" font-size="12" font-weight="700">
+              Cloud IAM Identity
+            </text>
+            <text x="700" y="659" fill="#fde68a" font-size="10">
+              {service_name}-sa
+            </text>
+            <text x="700" y="676" fill="#cbd5e1" font-size="9">
+              datastore · secretAccessor · GCS RO
+            </text>
+          </g>
+
+          <!-- ========================================================= -->
+          <!-- NODES: SHARED VPC HOST PROJECT                            -->
+          <!-- ========================================================= -->
+
+          <!-- Secret Manager (Cross-Project LDAP Credentials) -->
+          <g class="node" data-id="secret_ldap" data-flows="login admin sync">
+            <rect x="968" y="196" width="298" height="82" rx="8" fill="#0f172a" />
+            <rect class="node-stroke" x="968" y="196" width="298" height="82" rx="8"
+              fill="rgba(136, 19, 55, 0.45)" stroke="#fb7185" stroke-width="1.8" />
+            <foreignObject x="982" y="215" width="44" height="44">
+              <div xmlns="http://www.w3.org/1999/xhtml" class="svc-icon-wrap">
+                <img src="gcp-svg-icons/Security Identity/SVG/SecurityIdentity-512-color.svg" alt="Secret Manager LDAP" />
+              </div>
+            </foreignObject>
+            <text x="1038" y="226" fill="#ffffff" font-size="12" font-weight="700">
+              Secret Manager (LDAP)
+            </text>
+            <text x="1038" y="244" fill="#fecdd3" font-size="10">
+              auth_ldap_credentials (Cross-Proj)
+            </text>
+            <text x="1038" y="261" fill="#cbd5e1" font-size="9.5">
+              Cached once/process · ldapreader RO
+            </text>
+          </g>
+
+          <!-- Shared VPC Direct Egress -->
+          <g class="node" data-id="shared_vpc" data-flows="login admin sync">
+            <rect x="968" y="312" width="298" height="78" rx="8" fill="#0f172a" />
+            <rect class="node-stroke" x="968" y="312" width="298" height="78" rx="8"
+              fill="rgba(8, 51, 68, 0.55)" stroke="#38bdf8" stroke-width="1.8" />
+            <foreignObject x="982" y="329" width="44" height="44">
+              <div xmlns="http://www.w3.org/1999/xhtml" class="svc-icon-wrap">
+                <img src="gcp-svg-icons/Networking/SVG/Networking-512-color-rgb.svg" alt="Shared VPC" />
+              </div>
+            </foreignObject>
+            <text x="1038" y="340" fill="#ffffff" font-size="12" font-weight="700">
+              Direct VPC Egress
+            </text>
+            <text x="1038" y="358" fill="#bae6fd" font-size="10">
+              ALL_TRAFFIC · Dual-Stack Subnet
+            </text>
+            <text x="1038" y="375" fill="#cbd5e1" font-size="9.5">
+              Tag: egress-via-wireguard-gateway
+            </text>
+          </g>
+
+          <!-- WireGuard Gateway VM -->
+          <g class="node" data-id="wireguard_vm" data-flows="login admin sync">
+            <rect x="968" y="424" width="298" height="76" rx="8" fill="#0f172a" />
+            <rect class="node-stroke" x="968" y="424" width="298" height="76" rx="8"
+              fill="rgba(120, 53, 15, 0.42)" stroke="#fbbf24" stroke-width="1.8" />
+            <foreignObject x="982" y="440" width="44" height="44">
+              <div xmlns="http://www.w3.org/1999/xhtml" class="svc-icon-wrap">
+                <img src="gcp-svg-icons/Compute/SVG/Compute-512-color.svg" alt="Compute Engine WireGuard" />
+              </div>
+            </foreignObject>
+            <text x="1038" y="452" fill="#ffffff" font-size="12" font-weight="700">
+              WireGuard Gateway VM
+            </text>
+            <text x="1038" y="470" fill="#fde68a" font-size="10">
+              Compute Engine · Site-to-Site Tunnel
+            </text>
+            <text x="1038" y="487" fill="#cbd5e1" font-size="9.5">
+              Encrypted Routing to On-Prem LAN
+            </text>
+          </g>
+
+          <!-- ========================================================= -->
+          <!-- NODES: ON-PREMISES (Independent -> Rounded Boxes + Text)  -->
+          <!-- ========================================================= -->
+
+          <!-- Synology NAS DSM Auth API -->
+          <g class="node" data-id="synology_nas" data-flows="login">
+            <rect x="968" y="598" width="298" height="74" rx="8" fill="#0f172a" />
+            <rect class="node-stroke" x="968" y="598" width="298" height="74" rx="8"
+              fill="rgba(136, 19, 55, 0.50)" stroke="#fb7185" stroke-width="1.8" />
+            <text x="1117" y="623" fill="#ffffff" font-size="12.5" font-weight="700" text-anchor="middle">
+              Synology NAS · DSM Auth API
+            </text>
+            <text x="1117" y="642" fill="#fecdd3" font-size="10" text-anchor="middle">
+              SYNO.API.Auth v6 · HTTPS POST Body Only
+            </text>
+            <text x="1117" y="659" fill="#cbd5e1" font-size="9.5" text-anchor="middle">
+              Primary Credential Check · Issues SID
+            </text>
+          </g>
+
+          <!-- On-Premises Active Directory / LDAP -->
+          <g class="node" data-id="active_directory" data-flows="login admin">
+            <rect x="968" y="694" width="298" height="74" rx="8" fill="#0f172a" />
+            <rect class="node-stroke" x="968" y="694" width="298" height="74" rx="8"
+              fill="rgba(136, 19, 55, 0.50)" stroke="#fb7185" stroke-width="1.8" />
+            <text x="1117" y="719" fill="#ffffff" font-size="12.5" font-weight="700" text-anchor="middle">
+              Active Directory / LDAP (RO)
+            </text>
+            <text x="1117" y="738" fill="#fecdd3" font-size="10" text-anchor="middle">
+              LDAPS / StartTLS · memberOf &amp; Search
+            </text>
+            <text x="1117" y="755" fill="#cbd5e1" font-size="9.5" text-anchor="middle">
+              ADR-0001: Portal Never Writes to AD
+            </text>
+          </g>
+
+          <!-- ========================================================= -->
+          <!-- HIGH-CONTRAST FLOW PILL LABELS (On top of arrows)         -->
+          <!-- ========================================================= -->
+          <g class="flow-edge" data-flows="login rbac">
+            <rect x="112" y="122" width="126" height="20" rx="10" fill="#0f172a" stroke="#38bdf8" stroke-width="1" />
+            <text x="175" y="135" fill="#bae6fd" font-size="9.5" font-weight="600" text-anchor="middle">JWT Cookie HTTPS</text>
+          </g>
+          <g class="flow-edge" data-flows="sync">
+            <rect x="780" y="66" width="166" height="20" rx="10" fill="#0f172a" stroke="#fb923c" stroke-width="1" />
+            <text x="863" y="79" fill="#fed7aa" font-size="9.5" font-weight="600" text-anchor="middle">Seed Mappings &amp; Roles</text>
+          </g>
+          <g class="flow-edge" data-flows="login admin">
+            <rect x="742" y="342" width="176" height="20" rx="10" fill="#0f172a" stroke="#38bdf8" stroke-width="1" />
+            <text x="830" y="355" fill="#bae6fd" font-size="9.5" font-weight="600" text-anchor="middle">Private Egress (VPC)</text>
+          </g>
+          <g class="flow-edge" data-flows="login">
+            <rect x="978" y="528" width="144" height="20" rx="10" fill="#0f172a" stroke="#fb7185" stroke-width="1" />
+            <text x="1050" y="541" fill="#fecdd3" font-size="9.5" font-weight="600" text-anchor="middle">HTTPS POST Auth</text>
+          </g>
+          <g class="flow-edge" data-flows="login admin">
+            <rect x="1142" y="528" width="136" height="20" rx="10" fill="#0f172a" stroke="#fb7185" stroke-width="1" />
+            <text x="1210" y="541" fill="#fecdd3" font-size="9.5" font-weight="600" text-anchor="middle">LDAPS Read-Only</text>
+          </g>
+
+          <!-- ========================================================= -->
+          <!-- LEGEND (Strictly OUTSIDE all boundary boxes: y=820)       -->
+          <!-- ========================================================= -->
+          <rect x="30" y="820" width="1260" height="76" rx="10"
+            fill="#0f172a" stroke="#475569" stroke-width="1.4" />
+          <text x="50" y="844" fill="#f8fafc" font-size="11.5" font-weight="700">圖例說明 (LEGEND)</text>
+
+          <!-- Color Legend Items -->
+          <rect x="50" y="858" width="16" height="16" rx="4" fill="rgba(8, 51, 68, 0.7)" stroke="#38bdf8" stroke-width="1.5" />
+          <text x="74" y="870" fill="#e2e8f0" font-size="11">前端 / 網路 (Frontend &amp; VPC)</text>
+
+          <rect x="275" y="858" width="16" height="16" rx="4" fill="rgba(6, 78, 59, 0.7)" stroke="#34d399" stroke-width="1.5" />
+          <text x="299" y="870" fill="#e2e8f0" font-size="11">後端運算 (Cloud Run / FastAPI)</text>
+
+          <rect x="520" y="858" width="16" height="16" rx="4" fill="rgba(76, 29, 149, 0.7)" stroke="#c084fc" stroke-width="1.5" />
+          <text x="544" y="870" fill="#e2e8f0" font-size="11">資料庫與稽核 (Firestore / Audit)</text>
+
+          <rect x="775" y="858" width="16" height="16" rx="4" fill="rgba(136, 19, 55, 0.7)" stroke="#fb7185" stroke-width="1.5" />
+          <text x="799" y="870" fill="#e2e8f0" font-size="11">安全與地端驗證 (Security / AD / NAS)</text>
+
+          <rect x="1065" y="858" width="16" height="16" rx="4" fill="rgba(120, 53, 15, 0.6)" stroke="#fbbf24" stroke-width="1.5" />
+          <text x="1089" y="870" fill="#e2e8f0" font-size="11">GCP 基礎設施 / 快取</text>
+
+          <!-- Line Legend Items -->
+          <line x1="275" y1="840" x2="315" y2="840" stroke="#38bdf8" stroke-width="2" />
+          <text x="323" y="844" fill="#cbd5e1" font-size="10.5">實線：主要請求 / 資料流</text>
+
+          <line x1="520" y1="840" x2="560" y2="840" stroke="#fb7185" stroke-width="2" stroke-dasharray="5,3" />
+          <text x="568" y="844" fill="#cbd5e1" font-size="10.5">虛線：驗證 / 密鑰 / 唯讀目錄 / 同步流</text>
+
+          <text x="865" y="844" fill="#94a3b8" font-size="10.5">💡 附帶圖示＝GCP 雲端服務；純圓角方框＝獨立元件或地端服務</text>
+        </svg>
+      </div>
+
+      <!-- Interactive Inspector -->
+      <section class="inspector" id="inspector">
+        <div class="inspector-main">
+          <div class="inspector-title">
+            <span id="insp-title">點擊架構圖中任一元件，檢視對應程式碼路徑、端點與安全設計</span>
+            <span class="inspector-badge" id="insp-badge">Interactive Inspector</span>
+          </div>
+          <p class="inspector-desc" id="insp-desc">
+            您也可以點擊上方「1. 登入聚合」、「2. 即時 RBAC」、「3. 管理與稽核」、「4. 啟動與同步」按鈕，單獨高亮對應的資料流與關聯元件。
+          </p>
+          <div class="inspector-meta" id="insp-meta">
+            <span class="meta-chip">專案: jp/pythonportal</span>
+            <span class="meta-chip">架構原則: ADR-0001 AD 唯讀</span>
+            <span class="meta-chip">預設策略: Implicit Deny (403)</span>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Summary Cards (3-column grid per architecture-diagram skill) -->
+    <section class="cards-grid">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-dot emerald"></div>
+          <h3>身分驗證與工作階段 (Identity &amp; Session)</h3>
+        </div>
+        <ul>
+          <li>• <strong>主憑證驗證</strong>：登入經 WireGuard 呼叫地端 Synology NAS <code>SYNO.API.Auth v6</code>（HTTPS POST Body，不走 URL）。</li>
+          <li>• <strong>深度身分聚合</strong>：同步透過 <code>ldap3</code> 4 階段 TLS 協商向 AD 取得 <code>memberOf</code> 群組，存入 Firestore <code>auth_sessions</code>。</li>
+          <li>• <strong>無角色 JWT</strong>：<code>j_t</code>（HS256）僅攜帶 <code>sub</code>/<code>sid</code> 與到期時間，支援滑動續約與絕對過期，不快取舊權限。</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-dot violet"></div>
+          <h3>動態 RBAC 與記憶體快取 (Dynamic RBAC)</h3>
+        </div>
+        <ul>
+          <li>• <strong>零 I/O 權限判定</strong>：<code>RBACCache</code> 預編譯路由正則與群組反向索引，每 10 分鐘自動從 Firestore 刷新，亦支援管理員即時重載。</li>
+          <li>• <strong>4 源角色聯集</strong>：合併 AD 群組綁定、Portal 群組、直接角色指派與 <code>BREAK_GLASS_ADMIN_USERS</code>，無對應則回落至基準 <code>user</code>。</li>
+          <li>• <strong>預設拒絕與稽核</strong>：未映射路由一律 403 Implicit Deny，所有拒絕與管理變更皆寫入 730 天 TTL 的 <code>auth_audit_logs</code>。</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-dot rose"></div>
+          <h3>安全邊界與混合雲隔離 (Security Boundaries)</h3>
+        </div>
+        <ul>
+          <li>• <strong>ADR-0001 唯讀原則</strong>：Portal 僅持 <code>ldapreader</code> 唯讀帳密，永不寫入 AD；應用層群組與角色全數落於 Firestore。</li>
+          <li>• <strong>跨專案密鑰隔離</strong>：JWT 金鑰置於 Service Project，AD 帳密獨立存於 Shared VPC Host Project（<code>79</code>）。</li>
+          <li>• <strong>憑證與網路防護</strong>：GCS 唯讀掛載 Certbot <code>chain.pem</code> 驗證 LDAPS；所有對外流量經 Direct VPC Egress 導向 WireGuard。</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <span>Generated from <code>jp/pythonportal</code> (<code>src/auth/</code>, <code>deployments/terraform/pythonportal/main.tf</code>, <code>ADR-0001</code>)</span>
+      <span>Icons: relative paths under <code>architecture_icons/gcp-svg-icons/</code> · Dark High-Contrast Theme</span>
+    </footer>
+  </div>
+
+  <script>
+    const NODE_DETAILS = {
+      frontend: {
+        title: "Staff Portal Frontend (Browser SPA)",
+        badge: "Independent Client",
+        desc: "員工入口網站前端介面。登入後由後端寫入 HttpOnly Cookie (j_t)，所有 API 請求均受 NoStoreCacheControlMiddleware 保護以避免敏感資料快取。",
+        meta: ["Cookie: j_t (HttpOnly)", "No-Store Cache Control", "CORS Enabled"]
+      },
+      bootstrap: {
+        title: "Route Bootstrap CLI (scripts/bootstrap_routes.py)",
+        badge: "GCP DevOps / CI-CD",
+        desc: "於部署流程中掃描 FastAPI 路由表，自動產生 Method:PathRegex → perm:* 寫入 Firestore auth_api_mappings，清除孤兒映射並建立 admin / user / mail_admin 基準角色。",
+        meta: ["scripts/bootstrap_routes.py", "src/auth/route_table.py", "Skips /mail/ingest (M2M)"]
+      },
+      auth_router: {
+        title: "Auth Core Router (src/auth/router.py)",
+        badge: "FastAPI Submodule",
+        desc: "處理登入 (/auth/login)、個人授權檢視 (/auth/me)、滑動續約 (/auth/renew)、工作階段到期查詢 (/auth/session-status) 與登出撤銷 (/auth/logout)。",
+        meta: ["POST /auth/login", "GET /auth/me", "POST /auth/renew", "GET /auth/logout"]
+      },
+      admin_router: {
+        title: "Auth Admin Panel Router (src/auth/admin/)",
+        badge: "FastAPI Submodule",
+        desc: "受 Router-level DynamicPermissionChecker 保護的管理介面。支援角色 CRUD（含 dry_run 與防鎖死護欄）、AD/Portal 群組管理、使用者直接角色、AD 目錄搜尋與游標分頁稽核查詢。",
+        meta: ["Prefix: /admin/auth/*", "Atomic commit_with_audit", "directory.py & audit_query.py"]
+      },
+      auth_service: {
+        title: "Auth Service & DynamicPermissionChecker",
+        badge: "Core Security Engine",
+        desc: "負責 HS256 JWT 簽驗、單次請求共享 Firestore Session 查詢 (current_session_dep)、Synology SID 時效檢查、Break-Glass 緊急管理員判斷、4 來源有效角色解析與 Implicit Deny。",
+        meta: ["src/auth/service.py", "src/auth/constants.py", "JWT HS256 (30m / 1d abs)"]
+      },
+      rbac_cache: {
+        title: "In-Memory RBACCache (src/auth/cache.py)",
+        badge: "In-Memory Cache",
+        desc: "快取預編譯路由正則、角色權限、角色繼承樹、群組角色與 Portal 群組成員反向索引。於 Lifespan 強制預熱，並由背景任務每 10 分鐘自動同步（或管理員手動刷新）。",
+        meta: ["src/auth/cache.py", "Refresh: every 600s", "Recursive Role Inheritance"]
+      },
+      ldap_client: {
+        title: "Shared LDAP Client (src/auth/ldap_client.py)",
+        badge: "Directory Connector",
+        desc: "登入與管理搜尋共用的 AD 連線模組。每次呼叫於 Threadpool 建立獨立 ldap3 連線（不池化），採 IP_V6_PREFERRED、5 秒逾時與 4 階段 TLS 協商退避機制。",
+        meta: ["src/auth/ldap_client.py", "src/auth/ldap_config.py", "4-Step TLS Ladder"]
+      },
+      audit_logger: {
+        title: "Audit Logger (src/auth/audit.py)",
+        badge: "Compliance & Audit",
+        desc: "記錄 LOGIN_SUCCESS、LOGIN_FAILED、PERMISSION_DENIED、ADMIN_CHANGE、MAIL_ADMIN_ACCESS 至 Firestore，自動附加 730 天過期的 expire_at 供 TTL 清理。",
+        meta: ["src/auth/audit.py", "Retention: 730 Days", "Firestore TTL Policy"]
+      },
+      middleware: {
+        title: "FastAPI Middleware Stack (src/main.py)",
+        badge: "HTTP Layer",
+        desc: "最外層為 NoStoreCacheControlMiddleware，確保包含 CORS preflight 在內之回應皆不被快取；並註冊 BackendConnectionError 統一錯誤處理器。",
+        meta: ["src/main.py", "src/http_cache.py", "BackendConnectionError Handler"]
+      },
+      cloud_run_job: {
+        title: "Cloud Run v2 Job (Integration Test Gate)",
+        badge: "GCP Cloud Run Job",
+        desc: "執行 scripts/integration_test.py 驗證網路、LDAP TLS 與資料庫連通性（含非阻斷性 FANUC 檢查），與正式服務共用 Service Account、Shared VPC 與 GCS 憑證掛載。",
+        meta: ["jp-integration-test", "Timeout: 300s", "Shared VPC + GCS Mount"]
+      },
+      firestore: {
+        title: "Cloud Firestore (Native Mode)",
+        badge: "GCP Database",
+        desc: "儲存工作階段與完整 RBAC 規則。所有集合依 AUTH_ENVIRONMENT 加上前綴（如 staging_auth_*），auth_audit_logs 具備 7 組複合索引與 expire_at TTL。",
+        meta: ["7 auth_* Collections", "7 Composite Audit Indexes", "expire_at TTL Exempted"]
+      },
+      secret_jwt: {
+        title: "Secret Manager — JWT Signing Key",
+        badge: "GCP Security",
+        desc: "位於 Service Project (jp) 的 auth_jwt_signing_key，於 FastAPI Lifespan 啟動時讀取以簽發 HS256 JWT。",
+        meta: ["Secret: auth_jwt_signing_key", "Algorithm: HS256", "Auto Replication"]
+      },
+      gcs_certs: {
+        title: "Cloud Storage — Certbot TLS Chain",
+        badge: "GCP Storage",
+        desc: "將 Certbot 簽發之 TLS 憑證鏈 (chain.pem) 以唯讀 GCS Volume (ldap-tls-certs) 掛載進 Cloud Run，供 LDAP Client 驗證地端 AD 憑證。",
+        meta: ["Volume: ldap-tls-certs (RO)", "Env: LDAP_SERVER_CA_CERTS_FILE", "roles/storage.objectViewer"]
+      },
+      iam_sa: {
+        title: "Cloud IAM Service Account",
+        badge: "GCP IAM",
+        desc: "Cloud Run Service 與 Job 共用身分 {service_name}-sa，採最小權限原則存取 Firestore、Secret Manager（含跨專案 LDAP Secret）與 Certbot GCS Bucket。",
+        meta: ["roles/datastore.user", "roles/secretmanager.secretAccessor", "roles/storage.objectViewer"]
+      },
+      secret_ldap: {
+        title: "Secret Manager — Cross-Project LDAP Credentials",
+        badge: "GCP Shared VPC Host",
+        desc: "位於 Shared VPC Host Project (79) 的 auth_ldap_credentials，內含唯讀 ldapreader 帳號、密碼、host 與 base_dn，每行程僅讀取快取一次。",
+        meta: ["Project: 79", "Secret: auth_ldap_credentials", "Read-Only ldapreader"]
+      },
+      shared_vpc: {
+        title: "Shared VPC & Direct VPC Egress",
+        badge: "GCP Networking",
+        desc: "Cloud Run 透過 Direct VPC Egress (ALL_TRAFFIC) 接入 Shared VPC 雙堆疊子網路，並掛載 egress-via-wireguard-gateway 標籤導向地端。",
+        meta: ["j-shared-vpc-host", "Egress: ALL_TRAFFIC", "Tag: egress-via-wireguard-gateway"]
+      },
+      wireguard_vm: {
+        title: "WireGuard Gateway VM (Compute Engine)",
+        badge: "GCP Compute",
+        desc: "擔任雲端與地端機房之間的安全加密路由閘道，轉發 Cloud Run 至地端 Synology NAS 與 Active Directory 的私有流量。",
+        meta: ["WireGuard Site-to-Site", "Routes to On-Prem LAN", "Dual-Stack / IPv6 Preferred"]
+      },
+      synology_nas: {
+        title: "Synology NAS — DSM Auth API",
+        badge: "On-Premises (Independent)",
+        desc: "主憑證驗證來源。後端經 HTTPS POST (SYNO.API.Auth v6) 傳送帳密於 Body（不進 URL），取得 sid 與 cookieinfo 後存入 Firestore auth_sessions。",
+        meta: ["SYNO.API.Auth v6", "HTTPS POST Body Only", "Session: FileStation"]
+      },
+      active_directory: {
+        title: "On-Premises Active Directory / LDAP",
+        badge: "On-Premises (Read-Only)",
+        desc: "遵循 ADR-0001，Portal 僅使用 ldapreader 唯讀查詢（永不寫入 AD）。登入時擷取 memberOf 群組 CN；管理後台則透過分頁搜尋 sAMAccountName 與 cn。",
+        meta: ["ADR-0001: Strictly Read-Only", "LDAPS / StartTLS", "Paged Search (<=500/page)"]
+      }
+    };
+
+    // Node click inspector
+    const nodes = document.querySelectorAll('.node');
+    const edges = document.querySelectorAll('.flow-edge');
+    const flowBtns = document.querySelectorAll('.flow-btn');
+
+    nodes.forEach(node => {
+      node.addEventListener('click', () => {
+        nodes.forEach(n => n.classList.remove('selected'));
+        node.classList.add('selected');
+        const info = NODE_DETAILS[node.dataset.id];
+        if (!info) return;
+        document.getElementById('insp-title').textContent = info.title;
+        document.getElementById('insp-badge').textContent = info.badge;
+        document.getElementById('insp-desc').textContent = info.desc;
+        const metaEl = document.getElementById('insp-meta');
+        metaEl.innerHTML = info.meta.map(m => `<span class="meta-chip">${m}</span>`).join('');
+      });
+    });
+
+    // Flow filter buttons
+    flowBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        flowBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const flow = btn.dataset.flow;
+
+        if (flow === 'all') {
+          nodes.forEach(n => n.classList.remove('dimmed'));
+          edges.forEach(e => { e.classList.remove('dimmed'); e.classList.remove('highlighted'); });
+          return;
+        }
+
+        nodes.forEach(n => {
+          const list = (n.dataset.flows || '').split(' ');
+          n.classList.toggle('dimmed', !list.includes(flow));
+        });
+
+        edges.forEach(e => {
+          const list = (e.dataset.flows || '').split(' ');
+          const match = list.includes(flow);
+          e.classList.toggle('dimmed', !match);
+          e.classList.toggle('highlighted', match);
+        });
+      });
+    });
+
+    // Export toolbar (architecture-diagram skill built-in)
+    function toggleToolbar() {
+      document.getElementById('export-toolbar').classList.toggle('open');
+    }
+
+    async function captureCanvas() {
+      const target = document.getElementById('report-container');
+      const rect = target.getBoundingClientRect();
+      const pad = 32;
+      return html2canvas(document.body, {
+        backgroundColor: '#020617',
+        scale: 2,
+        useCORS: true,
+        x: Math.max(0, rect.left + window.scrollX - pad),
+        y: Math.max(0, rect.top + window.scrollY - pad),
+        width: rect.width + pad * 2,
+        height: rect.height + pad * 2,
+        ignoreElements: el => el.classList && (el.classList.contains('toolbar') || el.classList.contains('flow-filters'))
+      });
+    }
+
+    async function copyAsImage() {
+      const canvas = await captureCanvas();
+      canvas.toBlob(async blob => {
+        try {
+          await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+          alert('已複製高解析度架構圖至剪貼簿！');
+        } catch (err) {
+          alert('剪貼簿寫入失敗（請確認為 HTTPS 或 localhost 環境）：' + err.message);
+        }
+      });
+    }
+
+    async function downloadPNG() {
+      const canvas = await captureCanvas();
+      const link = document.createElement('a');
+      link.download = 'pythonportal-auth-architecture.png';
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    }
+
+    async function downloadPDF() {
+      const canvas = await captureCanvas();
+      const imgData = canvas.toDataURL('image/png');
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF({
+        orientation: canvas.width > canvas.height ? 'landscape' : 'portrait',
+        unit: 'px',
+        format: [canvas.width, canvas.height]
+      });
+      pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+      pdf.save('pythonportal-auth-architecture.pdf');
+    }
+  </script>
+</body>
+</html>

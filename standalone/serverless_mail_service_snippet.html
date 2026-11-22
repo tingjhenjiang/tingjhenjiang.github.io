@@ -1,0 +1,1436 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>j-serverless-mailservice — System Architecture Diagram</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js" integrity="sha384-ZZ1pncU3bQe8y31yfZdMFdSpttDoPmOZg2wguVK9almUodir1PghgT0eY7Mrty8H" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js" integrity="sha384-en/ztfPSRkGfME4KIm05joYXynqzUgbsG5nMrj/xEFAHXkeZfO3yMK8QQ+mP7p1/" crossorigin="anonymous"></script>
+  <style>
+    :root {
+      --bg-canvas: #020617;
+      --bg-card: #0f172a;
+      --bg-elevated: #1e293b;
+      --border-subtle: #334155;
+      --text-primary: #f8fafc;
+      --text-secondary: #cbd5e1;
+      --text-muted: #94a3b8;
+
+      --cyan: #22d3ee;
+      --cyan-bg: rgba(8, 51, 68, 0.55);
+      --emerald: #34d399;
+      --emerald-bg: rgba(6, 78, 59, 0.55);
+      --violet: #a78bfa;
+      --violet-bg: rgba(76, 29, 149, 0.55);
+      --amber: #fbbf24;
+      --amber-bg: rgba(120, 53, 15, 0.42);
+      --rose: #fb7185;
+      --rose-bg: rgba(136, 19, 55, 0.55);
+      --orange: #fb923c;
+      --orange-bg: rgba(154, 52, 18, 0.48);
+      --slate: #94a3b8;
+      --slate-bg: rgba(30, 41, 59, 0.78);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--bg-canvas);
+      color: var(--text-primary);
+      font-family: 'JetBrains Mono', 'Noto Sans TC', monospace, sans-serif;
+      line-height: 1.5;
+      padding: 24px;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1480px;
+      margin: 0 auto;
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+      margin-bottom: 18px;
+      flex-wrap: wrap;
+    }
+
+    .title-group {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+    }
+
+    .pulse-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--emerald);
+      margin-top: 8px;
+      box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.7);
+      animation: pulse 2s infinite;
+      flex-shrink: 0;
+    }
+
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.7); }
+      70% { box-shadow: 0 0 0 10px rgba(52, 211, 153, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0); }
+    }
+
+    h1 {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--text-primary);
+      letter-spacing: -0.02em;
+    }
+
+    .subtitle {
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-top: 4px;
+    }
+
+    /* Controls & Export Toolbar */
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .filter-bar {
+      display: flex;
+      gap: 6px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      padding: 4px;
+      border-radius: 8px;
+      flex-wrap: wrap;
+    }
+
+    .filter-btn {
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--text-secondary);
+      font-family: inherit;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 5px 10px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .filter-btn:hover {
+      color: var(--text-primary);
+      background: var(--bg-elevated);
+    }
+
+    .filter-btn.active {
+      background: rgba(34, 211, 238, 0.16);
+      color: var(--cyan);
+      border-color: var(--cyan);
+    }
+
+    .toolbar {
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .toolbar-actions {
+      display: none;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .toolbar.open .toolbar-actions {
+      display: flex;
+    }
+
+    .toolbar-toggle, .toolbar-btn {
+      background: var(--bg-card);
+      color: var(--text-primary);
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      padding: 6px 11px;
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .toolbar-toggle:hover, .toolbar-btn:hover {
+      border-color: var(--cyan);
+      color: var(--cyan);
+      background: var(--bg-elevated);
+    }
+
+    @media print {
+      .toolbar, .filter-bar { display: none !important; }
+    }
+
+    /* Main Diagram Card */
+    .diagram-card {
+      background: var(--bg-canvas);
+      border: 1.5px solid var(--border-subtle);
+      border-radius: 14px;
+      overflow-x: auto;
+      position: relative;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55);
+    }
+
+    .diagram-stage {
+      position: relative;
+      width: 1440px;
+      height: 1010px;
+      margin: 0 auto;
+      background-color: var(--bg-canvas);
+      background-image:
+        linear-gradient(to right, rgba(30, 41, 59, 0.55) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(30, 41, 59, 0.55) 1px, transparent 1px);
+      background-size: 40px 40px;
+    }
+
+    .svg-layer {
+      position: absolute;
+      inset: 0;
+      width: 1440px;
+      height: 1010px;
+      pointer-events: none;
+      z-index: 2;
+    }
+
+    /* Cloud Region Boundaries */
+    .boundary {
+      position: absolute;
+      border-radius: 12px;
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    .boundary-aws {
+      left: 24px; top: 144px; width: 694px; height: 740px;
+      border: 2px dashed var(--amber);
+      background: rgba(120, 53, 15, 0.08);
+    }
+
+    .boundary-gcp {
+      left: 748px; top: 144px; width: 668px; height: 740px;
+      border: 2px dashed var(--cyan);
+      background: rgba(8, 51, 68, 0.12);
+    }
+
+    .boundary-header {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 5px 12px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 700;
+      position: absolute;
+      top: -15px;
+      left: 16px;
+      background: var(--bg-canvas);
+    }
+
+    .boundary-aws .boundary-header {
+      border: 1.5px solid var(--amber);
+      color: var(--amber);
+    }
+
+    .boundary-gcp .boundary-header {
+      border: 1.5px solid var(--cyan);
+      color: var(--cyan);
+    }
+
+    .boundary-header img {
+      width: 20px;
+      height: 20px;
+      object-fit: contain;
+    }
+
+    .boundary-footer {
+      position: absolute;
+      bottom: 10px;
+      left: 14px;
+      right: 14px;
+      font-size: 10px;
+      color: var(--text-secondary);
+      background: rgba(15, 23, 42, 0.92);
+      border: 1px solid var(--border-subtle);
+      border-radius: 6px;
+      padding: 6px 10px;
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    /* Nodes */
+    .node {
+      position: absolute;
+      z-index: 4;
+      background: var(--bg-card);
+      border-radius: 8px;
+      border: 1.75px solid var(--slate);
+      padding: 10px 12px;
+      cursor: pointer;
+      transition: transform 0.16s ease, box-shadow 0.16s ease, opacity 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .node:hover {
+      transform: translateY(-2px);
+      z-index: 10;
+    }
+
+    .node.selected {
+      box-shadow: 0 0 0 3px rgba(248, 250, 252, 0.35), 0 10px 28px rgba(0, 0, 0, 0.6);
+      z-index: 11;
+    }
+
+    .node.dimmed {
+      opacity: 0.2;
+    }
+
+    /* Semantic Node Themes (High Contrast) */
+    .t-frontend { background: linear-gradient(135deg, #0f172a 0%, #083344 100%); border-color: var(--cyan); }
+    .t-backend  { background: linear-gradient(135deg, #0f172a 0%, #064e3b 100%); border-color: var(--emerald); }
+    .t-database { background: linear-gradient(135deg, #0f172a 0%, #3b1764 100%); border-color: var(--violet); }
+    .t-cloud    { background: linear-gradient(135deg, #0f172a 0%, #451a03 100%); border-color: var(--amber); }
+    .t-security { background: linear-gradient(135deg, #0f172a 0%, #4c0519 100%); border-color: var(--rose); }
+    .t-bus      { background: linear-gradient(135deg, #0f172a 0%, #431407 100%); border-color: var(--orange); }
+    .t-external { background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); border-color: #cbd5e1; border-style: solid; }
+
+    .node-icon {
+      width: 38px;
+      height: 38px;
+      border-radius: 6px;
+      background: rgba(248, 250, 252, 0.08);
+      border: 1px solid rgba(248, 250, 252, 0.14);
+      padding: 4px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .node-icon img {
+      width: 30px;
+      height: 30px;
+      object-fit: contain;
+      display: block;
+    }
+
+    .node-icon-stack {
+      display: flex;
+      gap: 4px;
+      flex-shrink: 0;
+    }
+
+    .node-icon-stack .node-icon {
+      width: 32px;
+      height: 32px;
+      padding: 3px;
+    }
+
+    .node-icon-stack .node-icon img {
+      width: 24px;
+      height: 24px;
+    }
+
+    .node-body {
+      min-width: 0;
+      flex: 1;
+    }
+
+    .node-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: #ffffff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .node-sub {
+      font-size: 10px;
+      color: #e2e8f0;
+      margin-top: 2px;
+      line-height: 1.35;
+    }
+
+    .node-badge {
+      display: inline-block;
+      margin-top: 4px;
+      font-size: 9px;
+      font-weight: 600;
+      padding: 1px 6px;
+      border-radius: 4px;
+      background: rgba(2, 6, 23, 0.72);
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      color: #f8fafc;
+    }
+
+    /* Standalone Non-AWS/GCP Pill inside Batch */
+    .batch-node {
+      flex-direction: column;
+      align-items: stretch;
+      padding: 12px;
+      gap: 8px;
+    }
+
+    .batch-top {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .batch-inner-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-top: 2px;
+    }
+
+    .inner-pill {
+      background: #020617;
+      border: 1.5px solid #cbd5e1;
+      border-radius: 6px;
+      padding: 7px 8px;
+      text-align: center;
+    }
+
+    .inner-pill-title {
+      font-size: 10.5px;
+      font-weight: 700;
+      color: #ffffff;
+    }
+
+    .inner-pill-sub {
+      font-size: 9px;
+      color: #cbd5e1;
+      margin-top: 2px;
+    }
+
+    /* Non-AWS/GCP Standalone Node (Rounded Rectangle with Text Only) */
+    .standalone-node {
+      justify-content: center;
+      text-align: center;
+      flex-direction: column;
+      gap: 3px;
+      border-width: 2px;
+      border-radius: 10px;
+    }
+
+    .standalone-tag {
+      font-size: 9px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--cyan);
+      background: rgba(2, 6, 23, 0.8);
+      padding: 1px 6px;
+      border-radius: 4px;
+      border: 1px solid rgba(34, 211, 238, 0.45);
+    }
+
+    /* Legend Outside All Boundaries */
+    .legend-bar {
+      position: absolute;
+      left: 24px;
+      top: 904px;
+      width: 1392px;
+      height: 82px;
+      background: var(--bg-card);
+      border: 1.5px solid var(--border-subtle);
+      border-radius: 10px;
+      padding: 10px 18px;
+      z-index: 5;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .legend-row {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      flex-wrap: wrap;
+      font-size: 11px;
+      color: var(--text-primary);
+    }
+
+    .legend-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      font-weight: 500;
+    }
+
+    .swatch {
+      width: 12px;
+      height: 12px;
+      border-radius: 3px;
+      border: 1.5px solid;
+      flex-shrink: 0;
+    }
+
+    .line-sample {
+      width: 26px;
+      height: 0;
+      border-top: 2.5px solid;
+      display: inline-block;
+    }
+
+    .line-dashed { border-top-style: dashed; }
+
+    /* SVG Edge Styling */
+    .edge-path {
+      fill: none;
+      stroke-width: 2.2;
+      transition: opacity 0.2s ease;
+    }
+
+    .edge-path.dimmed, .edge-label-group.dimmed {
+      opacity: 0.14;
+    }
+
+    .edge-animated {
+      stroke-dasharray: 6 4;
+      animation: flowDash 24s linear infinite;
+    }
+
+    @keyframes flowDash {
+      to { stroke-dashoffset: -400; }
+    }
+
+    .edge-label-bg {
+      fill: #020617;
+      stroke-width: 1.1;
+      rx: 4;
+    }
+
+    .edge-label-text {
+      font-family: 'JetBrains Mono', 'Noto Sans TC', monospace;
+      font-size: 9.5px;
+      font-weight: 700;
+      fill: #f8fafc;
+      text-anchor: middle;
+    }
+
+    /* Interactive Inspector Bar */
+    .inspector {
+      margin-top: 16px;
+      background: var(--bg-card);
+      border: 1.5px solid var(--cyan);
+      border-radius: 10px;
+      padding: 14px 18px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .inspector-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--cyan);
+    }
+
+    .inspector-meta {
+      font-size: 11px;
+      color: var(--text-secondary);
+      margin-top: 4px;
+    }
+
+    .inspector-desc {
+      font-size: 12px;
+      color: var(--text-primary);
+      margin-top: 6px;
+      max-width: 960px;
+    }
+
+    .inspector-icon-path {
+      font-size: 10.5px;
+      color: var(--amber);
+      background: #020617;
+      border: 1px solid var(--border-subtle);
+      padding: 6px 10px;
+      border-radius: 6px;
+      align-self: center;
+    }
+
+    /* 3 Summary Cards */
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-top: 18px;
+    }
+
+    @media (max-width: 960px) {
+      .cards-grid { grid-template-columns: 1fr; }
+    }
+
+    .card {
+      background: var(--bg-card);
+      border: 1.5px solid var(--border-subtle);
+      border-radius: 10px;
+      padding: 16px 18px;
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .card-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+
+    .dot-emerald { background: var(--emerald); }
+    .dot-rose { background: var(--rose); }
+    .dot-amber { background: var(--amber); }
+
+    .card h3 {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .card ul {
+      list-style: none;
+      font-size: 11.5px;
+      color: var(--text-secondary);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .card li strong {
+      color: var(--text-primary);
+    }
+
+    /* Footer */
+    .footer {
+      margin-top: 16px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border-subtle);
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--text-muted);
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container" id="report-container">
+    <!-- Header -->
+    <div class="header">
+      <div class="title-group">
+        <div class="pulse-dot"></div>
+        <div>
+          <h1>j-serverless-mailservice — Multi-Cloud Serverless Architecture</h1>
+          <div class="subtitle">AWS (us-west-2) × Google Cloud (us-west1 · j-serverless-mail) · Keyless WIF · ARM64 Fargate Spot · Hive Storage</div>
+        </div>
+      </div>
+
+      <div class="header-right">
+        <div class="filter-bar" role="group" aria-label="Flow filters">
+          <button class="filter-btn active" data-filter="all">全部流程</button>
+          <button class="filter-btn" data-filter="inbound">📥 收信管線</button>
+          <button class="filter-btn" data-filter="outbound">📤 寄信與讀取</button>
+          <button class="filter-btn" data-filter="security">🔐 跨雲 WIF / IAM</button>
+          <button class="filter-btn" data-filter="ops">⚙️ CI/CD 與監控</button>
+        </div>
+
+        <div class="toolbar" id="export-toolbar">
+          <div class="toolbar-actions">
+            <button class="toolbar-btn" onclick="copyAsImage()">📋 Copy</button>
+            <button class="toolbar-btn" onclick="downloadPNG()">🖼️ PNG</button>
+            <button class="toolbar-btn" onclick="downloadPDF()">📄 PDF</button>
+          </div>
+          <button class="toolbar-toggle" onclick="toggleToolbar()" title="Export Diagram">⋯</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main Interactive Diagram -->
+    <div class="diagram-card">
+      <div class="diagram-stage" id="diagram-stage">
+
+        <!-- Cloud Boundaries -->
+        <div class="boundary boundary-aws">
+          <div class="boundary-header">
+            <img src="aws-svg-icons/Architecture-Group-Icons/AWS-Cloud-logo_32.svg" alt="AWS Cloud" />
+            <img src="aws-svg-icons/Architecture-Group-Icons/Region_32.svg" alt="AWS Region" />
+            <span>AWS Cloud · Region: us-west-2 (terraform/aws/)</span>
+          </div>
+          <div class="boundary-footer">
+            <span>State: S3 Backend (use_lockfile · SSE · Versioning)</span>
+            <span>Default Tag: project = j-serverless-mailservice</span>
+          </div>
+        </div>
+
+        <div class="boundary boundary-gcp">
+          <div class="boundary-header">
+            <img src="gcp-svg-icons/Hybrid & Multicloud/SVG/HybridMulticloud-512-color.svg" alt="Google Cloud" />
+            <span>Google Cloud · Region: us-west1 · j-serverless-mail (terraform/gcp/)</span>
+          </div>
+          <div class="boundary-footer">
+            <span>State: GCS Backend · Standalone Project (No Shared VPC)</span>
+            <span>Firestore Indexes: deletion_policy = PREVENT</span>
+          </div>
+        </div>
+
+        <!-- SVG Connections Layer (drawn behind nodes) -->
+        <svg class="svg-layer" viewBox="0 0 1440 1010" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <marker id="arr-emerald" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto">
+              <polygon points="0 0, 9 3.5, 0 7" fill="#34d399" />
+            </marker>
+            <marker id="arr-orange" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto">
+              <polygon points="0 0, 9 3.5, 0 7" fill="#fb923c" />
+            </marker>
+            <marker id="arr-cyan" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto">
+              <polygon points="0 0, 9 3.5, 0 7" fill="#22d3ee" />
+            </marker>
+            <marker id="arr-rose" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto">
+              <polygon points="0 0, 9 3.5, 0 7" fill="#fb7185" />
+            </marker>
+            <marker id="arr-amber" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto">
+              <polygon points="0 0, 9 3.5, 0 7" fill="#fbbf24" />
+            </marker>
+            <marker id="arr-slate" markerWidth="9" markerHeight="7" refX="8" refY="3.5" orient="auto">
+              <polygon points="0 0, 9 3.5, 0 7" fill="#94a3b8" />
+            </marker>
+          </defs>
+
+          <!-- 1. INBOUND FLOW -->
+          <!-- External Senders -> SES -->
+          <path class="edge-path" data-flow="inbound" d="M 135 104 L 135 186" stroke="#34d399" marker-end="url(#arr-emerald)" />
+          <g class="edge-label-group" data-flow="inbound">
+            <rect class="edge-label-bg" x="58" y="114" width="154" height="18" stroke="#34d399" />
+            <text class="edge-label-text" x="135" y="126">SMTP *@mail.j.com</text>
+          </g>
+
+          <!-- SES -> S3 -->
+          <path class="edge-path" data-flow="inbound" d="M 232 232 L 270 232" stroke="#34d399" marker-end="url(#arr-emerald)" />
+          <g class="edge-label-group" data-flow="inbound">
+            <rect class="edge-label-bg" x="235" y="205" width="38" height="16" stroke="#34d399" />
+            <text class="edge-label-text" x="254" y="216">TMP/</text>
+          </g>
+
+          <!-- S3 -> Lambda -->
+          <path class="edge-path" data-flow="inbound" d="M 484 232 L 520 232" stroke="#34d399" marker-end="url(#arr-emerald)" />
+          <g class="edge-label-group" data-flow="inbound">
+            <rect class="edge-label-bg" x="486" y="205" width="36" height="16" stroke="#34d399" />
+            <text class="edge-label-text" x="504" y="216">Event</text>
+          </g>
+
+          <!-- Lambda -> SQS -->
+          <path class="edge-path" data-flow="inbound" d="M 565 280 L 565 304 L 146 304 L 146 340" stroke="#fb923c" marker-end="url(#arr-orange)" />
+          <g class="edge-label-group" data-flow="inbound">
+            <rect class="edge-label-bg" x="180" y="294" width="144" height="18" stroke="#fb923c" />
+            <text class="edge-label-text" x="252" y="306">SQS Pointer (No Body)</text>
+          </g>
+
+          <!-- Lambda -> Batch SubmitJob -->
+          <path class="edge-path" data-flow="inbound" d="M 628 280 L 628 324" stroke="#34d399" marker-end="url(#arr-emerald)" />
+          <g class="edge-label-group" data-flow="inbound">
+            <rect class="edge-label-bg" x="588" y="293" width="80" height="18" stroke="#34d399" />
+            <text class="edge-label-text" x="628" y="305">SubmitJob</text>
+          </g>
+
+          <!-- SQS -> Batch -->
+          <path class="edge-path" data-flow="inbound" d="M 248 394 L 284 394" stroke="#fb923c" marker-end="url(#arr-orange)" />
+
+          <!-- Batch <-> S3 (Read TMP, Write mail/, Sync clamav-db) -->
+          <path class="edge-path" data-flow="inbound" d="M 380 328 L 380 282" stroke="#34d399" marker-end="url(#arr-emerald)" />
+          <g class="edge-label-group" data-flow="inbound">
+            <rect class="edge-label-bg" x="336" y="294" width="136" height="18" stroke="#34d399" />
+            <text class="edge-label-text" x="404" y="306">Write mail/ + AV DB</text>
+          </g>
+
+          <!-- ECR -> Batch -->
+          <path class="edge-path" data-flow="inbound ops" d="M 238 594 L 266 594 L 266 472 L 284 472" stroke="#fbbf24" stroke-dasharray="5 3" marker-end="url(#arr-amber)" />
+          <g class="edge-label-group" data-flow="inbound ops">
+            <rect class="edge-label-bg" x="196" y="514" width="90" height="18" stroke="#fbbf24" />
+            <text class="edge-label-text" x="241" y="526">Pull ARM64</text>
+          </g>
+
+          <!-- Batch -> GCS Ingest Bucket (Cross-Cloud HTTPS) -->
+          <path class="edge-path edge-animated" data-flow="inbound" d="M 698 394 L 774 394" stroke="#34d399" marker-end="url(#arr-emerald)" />
+          <g class="edge-label-group" data-flow="inbound">
+            <rect class="edge-label-bg" x="678" y="366" width="114" height="18" stroke="#34d399" />
+            <text class="edge-label-text" x="735" y="378">JSON (ifGen=0)</text>
+          </g>
+
+          <!-- GCS Ingest -> Eventarc -->
+          <path class="edge-path" data-flow="inbound" d="M 970 394 L 998 394" stroke="#34d399" marker-end="url(#arr-emerald)" />
+
+          <!-- Eventarc -> Cloud Run Function -->
+          <path class="edge-path" data-flow="inbound" d="M 1148 394 L 1176 394" stroke="#34d399" marker-end="url(#arr-emerald)" />
+
+          <!-- Cloud Run Function -> Firestore -->
+          <path class="edge-path" data-flow="inbound" d="M 1286 444 L 1286 502" stroke="#34d399" marker-end="url(#arr-emerald)" />
+          <g class="edge-label-group" data-flow="inbound">
+            <rect class="edge-label-bg" x="1222" y="463" width="128" height="18" stroke="#34d399" />
+            <text class="edge-label-text" x="1286" y="475">Upsert Mail &amp; Box</text>
+          </g>
+
+          <!-- Cloud Run Function -> GCS Ingest (Delete processed JSON) -->
+          <path class="edge-path" data-flow="inbound" d="M 1218 444 L 1218 470 L 875 470 L 875 446" stroke="#34d399" stroke-dasharray="4 3" marker-end="url(#arr-emerald)" />
+          <g class="edge-label-group" data-flow="inbound">
+            <rect class="edge-label-bg" x="980" y="460" width="136" height="18" stroke="#34d399" />
+            <text class="edge-label-text" x="1048" y="472">Delete Processed JSON</text>
+          </g>
+
+          <!-- 2. CROSS-CLOUD KEYLESS AUTH (WIF & OIDC) -->
+          <!-- AWS Batch Role -> GCP WIF -->
+          <path class="edge-path edge-animated" data-flow="security inbound" d="M 698 594 L 774 594" stroke="#fb7185" marker-end="url(#arr-rose)" />
+          <g class="edge-label-group" data-flow="security inbound">
+            <rect class="edge-label-bg" x="676" y="566" width="118" height="18" stroke="#fb7185" />
+            <text class="edge-label-text" x="735" y="578">AWS→GCP WIF STS</text>
+          </g>
+
+          <!-- Batch <-> IAM Role -->
+          <path class="edge-path" data-flow="security" d="M 490 524 L 490 554" stroke="#fb7185" stroke-dasharray="4 3" marker-end="url(#arr-rose)" />
+
+          <!-- GCP WIF -> GCS Ingest (Impersonate mailservice-batch-writer) -->
+          <path class="edge-path" data-flow="security" d="M 840 504 L 840 446" stroke="#fb7185" stroke-dasharray="4 3" marker-end="url(#arr-rose)" />
+
+          <!-- pythonportal -> AWS IAM OIDC -->
+          <path class="edge-path edge-animated" data-flow="security outbound" d="M 780 264 L 734 264 L 734 556 L 698 556" stroke="#fb7185" marker-end="url(#arr-rose)" />
+          <g class="edge-label-group" data-flow="security outbound">
+            <rect class="edge-label-bg" x="684" y="492" width="102" height="18" stroke="#fb7185" />
+            <text class="edge-label-text" x="735" y="504">OIDC WebID</text>
+          </g>
+
+          <!-- On-Prem ERP / Cloudflare -> GCP Secret Manager -->
+          <path class="edge-path" data-flow="security" d="M 1300 104 L 1300 130 L 1404 130 L 1404 640 L 912 640 L 912 618" stroke="#fb7185" stroke-dasharray="4 3" marker-end="url(#arr-rose)" />
+          <g class="edge-label-group" data-flow="security">
+            <rect class="edge-label-bg" x="1220" y="630" width="160" height="18" stroke="#fb7185" />
+            <text class="edge-label-text" x="1300" y="642">WIF: erp-dns-firewall</text>
+          </g>
+
+          <!-- 3. OUTBOUND & READ PATH -->
+          <!-- staffportal-frontend <-> pythonportal -->
+          <path class="edge-path" data-flow="outbound" d="M 715 104 L 715 128 L 890 128 L 890 186" stroke="#22d3ee" marker-end="url(#arr-cyan)" />
+          <g class="edge-label-group" data-flow="outbound">
+            <rect class="edge-label-bg" x="742" y="118" width="128" height="18" stroke="#22d3ee" />
+            <text class="edge-label-text" x="806" y="130">REST + Sandboxed UI</text>
+          </g>
+
+          <!-- pythonportal -> Google Workspace SMTP Relay -->
+          <path class="edge-path" data-flow="outbound" d="M 960 190 L 960 108" stroke="#22d3ee" marker-end="url(#arr-cyan)" />
+          <g class="edge-label-group" data-flow="outbound">
+            <rect class="edge-label-bg" x="900" y="118" width="122" height="18" stroke="#22d3ee" />
+            <text class="edge-label-text" x="961" y="130">Primary SMTP Relay</text>
+          </g>
+
+          <!-- pythonportal -> GCS Relay-Sent Bucket -->
+          <path class="edge-path" data-flow="outbound" d="M 1070 232 L 1106 232" stroke="#22d3ee" marker-end="url(#arr-cyan)" />
+
+          <!-- pythonportal -> Firestore -->
+          <path class="edge-path" data-flow="outbound" d="M 980 278 L 980 310 L 1164 310 L 1164 502" stroke="#22d3ee" marker-end="url(#arr-cyan)" />
+          <g class="edge-label-group" data-flow="outbound">
+            <rect class="edge-label-bg" x="1008" y="300" width="132" height="18" stroke="#22d3ee" />
+            <text class="edge-label-text" x="1074" y="312">R/W Mail Metadata</text>
+          </g>
+
+          <!-- pythonportal -> S3 & SES Fallback -->
+          <path class="edge-path" data-flow="outbound" d="M 780 212 L 736 212 L 736 172 L 380 172 L 380 186" stroke="#22d3ee" stroke-dasharray="5 3" marker-end="url(#arr-cyan)" />
+          <path class="edge-path" data-flow="outbound" d="M 380 172 L 160 172 L 160 186" stroke="#22d3ee" stroke-dasharray="5 3" marker-end="url(#arr-cyan)" />
+          <g class="edge-label-group" data-flow="outbound">
+            <rect class="edge-label-bg" x="454" y="162" width="194" height="18" stroke="#22d3ee" />
+            <text class="edge-label-text" x="551" y="174">Read s3://mail/* · SES Fallback</text>
+          </g>
+
+          <!-- 4. CI/CD & OBSERVABILITY -->
+          <!-- GitHub -> AWS CodePipeline -->
+          <path class="edge-path" data-flow="ops" d="M 360 104 L 360 132 L 12 132 L 12 732 L 42 732" stroke="#fbbf24" stroke-dasharray="5 3" marker-end="url(#arr-amber)" />
+          <!-- GitHub -> GCP Cloud Build -->
+          <path class="edge-path" data-flow="ops" d="M 465 104 L 465 122 L 732 122 L 732 732 L 774 732" stroke="#fbbf24" stroke-dasharray="5 3" marker-end="url(#arr-amber)" />
+          <!-- CodePipeline -> ECR -->
+          <path class="edge-path" data-flow="ops" d="M 142 688 L 142 648" stroke="#fbbf24" marker-end="url(#arr-amber)" />
+          <!-- SQS/Batch -> CloudWatch/SNS -->
+          <path class="edge-path" data-flow="ops" d="M 550 524 L 550 544 L 708 544 L 708 732 L 700 732" stroke="#94a3b8" stroke-dasharray="4 3" marker-end="url(#arr-slate)" />
+          <!-- Ingest Function -> Cloud Monitoring -->
+          <path class="edge-path" data-flow="ops" d="M 1368 444 L 1368 684" stroke="#94a3b8" stroke-dasharray="4 3" marker-end="url(#arr-slate)" />
+        </svg>
+
+        <!-- ==================== TOP ROW: STANDALONE / EXTERNAL (Rounded Rectangles with Text) ==================== -->
+        <div class="node t-external standalone-node" style="left: 36px; top: 24px; width: 198px; height: 78px;"
+             data-flow="inbound"
+             data-title="External Email Senders"
+             data-meta="獨立外部服務 · Internet SMTP"
+             data-icon="獨立服務（圓角方框文字表示）"
+             data-desc="外部寄件者寄送郵件至專用子網域 *@mail.j.com（支援 + 階層別名如 accounts+social+facebook@mail.j.com）。公司主網域 @j.com 維持由 Google Workspace 處理。">
+          <span class="standalone-tag">External SMTP</span>
+          <div class="node-title">External Senders</div>
+          <div class="node-sub">*@mail.j.com</div>
+        </div>
+
+        <div class="node t-external standalone-node" style="left: 274px; top: 24px; width: 264px; height: 78px;"
+             data-flow="ops"
+             data-title="GitHub Repository"
+             data-meta="獨立外部服務 · jp/j-serverless-mailservice"
+             data-icon="獨立服務（圓角方框文字表示）"
+             data-desc="主幹 main 變更依路徑分流：terraform/aws/** 與 src/drain_job/** 觸發 AWS CodePipeline；terraform/gcp/** 與 src/ingest_function/** 觸發 GCP Cloud Build，雙雲 CI 彼此零憑證隔離。">
+          <span class="standalone-tag">Source Control</span>
+          <div class="node-title">GitHub (main branch)</div>
+          <div class="node-sub">j-serverless-mailservice</div>
+        </div>
+
+        <div class="node t-frontend standalone-node" style="left: 598px; top: 24px; width: 234px; height: 78px;"
+             data-flow="outbound"
+             data-title="staffportal-frontend"
+             data-meta="獨立前端模組 · Sandboxed <iframe>"
+             data-icon="獨立服務（圓角方框文字表示）"
+             data-desc="員工入口網前端郵件介面。以沙盒化 <iframe> 渲染已由後端淨化的 .html 郵件本文，形成獨立的第二層 XSS 防禦深度。">
+          <span class="standalone-tag">Web Frontend</span>
+          <div class="node-title">staffportal-frontend</div>
+          <div class="node-sub">Mail UI · Sandboxed &lt;iframe&gt;</div>
+        </div>
+
+        <div class="node t-external standalone-node" style="left: 882px; top: 24px; width: 248px; height: 78px;"
+             data-flow="outbound"
+             data-title="Google Workspace SMTP Relay"
+             data-meta="獨立外部郵件服務 · Primary Outbound"
+             data-icon="獨立服務（圓角方框文字表示）"
+             data-desc="pythonportal 預設主寄信通道。透過 SMTP Relay 寄出的郵件會自動備份歸檔至 GCP Relay-Sent GCS Bucket 的 folder=sent 分區。">
+          <span class="standalone-tag">SMTP Relay</span>
+          <div class="node-title">Google Workspace Relay</div>
+          <div class="node-sub">主寄信通道 &amp; @j.com</div>
+        </div>
+
+        <div class="node t-external standalone-node" style="left: 1180px; top: 24px; width: 236px; height: 78px;"
+             data-flow="security"
+             data-title="On-Prem ERP / Cloudflare WAF"
+             data-meta="獨立地端自動化 · it-maintenance-scripts"
+             data-icon="獨立服務（圓角方框文字表示）"
+             data-desc="地端 ERP DNS/防火牆自動化腳本透過 X.509 WIF 主體 erp-dns-firewall 存取 Secret Manager 中的舊版 mailservice-ingest-api-key（2026-11-19 起取代靜態 SA）。">
+          <span class="standalone-tag">On-Prem WIF</span>
+          <div class="node-title">ERP / Cloudflare WAF</div>
+          <div class="node-sub">subject: erp-dns-firewall</div>
+        </div>
+
+        <!-- ==================== AWS CLOUD NODES ==================== -->
+        <div class="node t-cloud" style="left: 44px; top: 190px; width: 188px; height: 86px;"
+             data-flow="inbound outbound"
+             data-title="Amazon SES"
+             data-meta="AWS · us-west-2 · mail.j.com"
+             data-icon="aws-svg-icons/Architecture-Service-Icons/Architecture-Service-Icons_01312024/Arch_Business-Applications/48/Arch_Amazon-Simple-Email-Service_48.svg"
+             data-desc="接收專用子網域郵件（規則集 mailservice-inbound）並寫入 S3 TMP/。同時作為 pythonportal 的備援寄信通道（SendEmail / SendRawEmail 僅限 mail.j.com）。">
+          <div class="node-icon">
+            <img src="aws-svg-icons/Architecture-Service-Icons/Architecture-Service-Icons_01312024/Arch_Business-Applications/48/Arch_Amazon-Simple-Email-Service_48.svg" alt="Amazon SES" />
+          </div>
+          <div class="node-body">
+            <div class="node-title">Amazon SES</div>
+            <div class="node-sub">MX Inbound &amp; Fallback Send</div>
+            <span class="node-badge">mail.j.com</span>
+          </div>
+        </div>
+
+        <div class="node t-database" style="left: 274px; top: 190px; width: 210px; height: 86px;"
+             data-flow="inbound outbound"
+             data-title="Amazon S3 (Mail Bucket)"
+             data-meta="AWS · Hive Partitioned Object Store"
+             data-icon="aws-svg-icons/Architecture-Service-Icons/Architecture-Service-Icons_01312024/Arch_Storage/48/Arch_Amazon-Simple-Storage-Service_48.svg"
+             data-desc="存放三種前綴：TMP/（SES 暫存原始 .eml）、mail/<eml|html|json|attachment>/dt=.../mailbox=.../folder=.../（Hive 分區永久封存，支援未來 Athena Partition Projection）、_system/clamav-db/（病毒庫快取）。">
+          <div class="node-icon">
+            <img src="aws-svg-icons/Architecture-Service-Icons/Architecture-Service-Icons_01312024/Arch_Storage/48/Arch_Amazon-Simple-Storage-Service_48.svg" alt="Amazon S3" />
+          </div>
+          <div class="node-body">
+            <div class="node-title">Amazon S3</div>
+            <div class="node-sub">TMP/ · mail/ (Hive) · _system/</div>
+            <span class="node-badge">eml · html · ndjson · att</span>
+          </div>
+        </div>
+
+        <div class="node t-backend" style="left: 524px; top: 190px; width: 174px; height: 86px;"
+             data-flow="inbound"
+             data-title="AWS Lambda (Inbound)"
+             data-meta="AWS · Python · ARM64 · No VPC"
+             data-icon="aws-svg-icons/Architecture-Service-Icons/Architecture-Service-Icons_01312024/Arch_Compute/48/Arch_AWS-Lambda_48.svg"
+             data-desc="輕量觸發器（Thin Lambda）：由 S3 TMP/ ObjectCreated 觸發，不解析郵件、不存取 S3 內容、不掛載 VPC。僅推送 SQS 指標並呼叫 AWS Batch SubmitJob。">
+          <div class="node-icon">
+            <img src="aws-svg-icons/Architecture-Service-Icons/Architecture-Service-Icons_01312024/Arch_Compute/48/Arch_AWS-Lambda_48.svg" alt="AWS Lambda" />
+          </div>
+          <div class="node-body">
+            <div class="node-title">AWS Lambda</div>
+            <div class="node-sub">Thin Enqueue &amp; Submit</div>
+            <span class="node-badge">ARM64 · No VPC</span>
+          </div>
+        </div>
+
+        <div class="node t-bus" style="left: 44px; top: 344px; width: 204px; height: 96px;"
+             data-flow="inbound ops"
+             data-title="Amazon SQS + DLQ"
+             data-meta="AWS · Metadata Pointer Queue"
+             data-icon="aws-svg-icons/Architecture-Service-Icons/Architecture-Service-Icons_01312024/Arch_App-Integration/48/Arch_Amazon-Simple-Queue-Service_48.svg"
+             data-desc="僅傳遞 S3 物件指標（bucket, key, received_at），避免附件觸及 SQS 大小限制。若掃描或上傳失敗將保留重試，超過 maxReceiveCount 移入 DLQ 並觸發告警。">
+          <div class="node-icon">
+            <img src="aws-svg-icons/Architecture-Service-Icons/Architecture-Service-Icons_01312024/Arch_App-Integration/48/Arch_Amazon-Simple-Queue-Service_48.svg" alt="Amazon SQS" />
+          </div>
+          <div class="node-body">
+            <div class="node-title">Amazon SQS + DLQ</div>
+            <div class="node-sub">Metadata Pointer Queue</div>
+            <span class="node-badge">Retry → DLQ Alarm</span>
+          </div>
+        </div>
+
+        <!-- AWS Batch Container with non-AWS internal tools as rounded text pills -->
+        <div class="node t-backend batch-node" style="left: 286px; top: 328px; width: 412px; height: 194px;"
+             data-flow="inbound security"
+             data-title="AWS Batch Drain Job (Fargate Spot)"
+             data-meta="AWS · ARM64 · 1 vCPU / 4GB · Max Concurrency = 1 · Public Subnet (No NAT)"
+             data-icon="aws-svg-icons/Architecture-Service-Icons/Architecture-Service-Icons_01312024/Arch_Compute/48/Arch_AWS-Batch_48.svg + Arch_AWS-Fargate_48.svg"
+             data-desc="單一並發清空 SQS：拉取 S3 TMP/、以內建 Rspamd（垃圾信）與 ClamAV（防毒並移除感染附件）掃描、淨化 HTML、寫入 S3 Hive 分區，再透過 WIF 上傳 Ingest Record JSON 至 GCS（成功或 412 才刪除 TMP/ 與 SQS）。">
+          <div class="batch-top">
+            <div class="node-icon-stack">
+              <div class="node-icon">
+                <img src="aws-svg-icons/Architecture-Service-Icons/Architecture-Service-Icons_01312024/Arch_Compute/48/Arch_AWS-Batch_48.svg" alt="AWS Batch" />
+              </div>
+              <div class="node-icon">
+                <img src="aws-svg-icons/Architecture-Service-Icons/Architecture-Service-Icons_01312024/Arch_Containers/48/Arch_AWS-Fargate_48.svg" alt="AWS Fargate" />
+              </div>
+            </div>
+            <div class="node-body">
+              <div class="node-title">AWS Batch Drain Job (Fargate Spot)</div>
+              <div class="node-sub">ARM64 · 1 vCPU / 4GB · Max Concurrency = 1 · Public IP (No NAT)</div>
+            </div>
+          </div>
+          <div class="batch-inner-grid">
+            <div class="inner-pill">
+              <div class="inner-pill-title">Rspamd</div>
+              <div class="inner-pill-sub">Stateless Spam<br/>SPF/DKIM/DMARC</div>
+            </div>
+            <div class="inner-pill">
+              <div class="inner-pill-title">ClamAV</div>
+              <div class="inner-pill-sub">clamd + freshclam<br/>Attachment Sanitize</div>
+            </div>
+            <div class="inner-pill">
+              <div class="inner-pill-title">Python Drain</div>
+              <div class="inner-pill-sub">MIME · HTML Clean<br/>DSN · WIF Upload</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="node t-cloud" style="left: 44px; top: 558px; width: 194px; height: 86px;"
+             data-flow="inbound ops"
+             data-title="Amazon ECR"
+             data-meta="AWS · Private Container Registry"
+             data-icon="aws-svg-icons/Architecture-Service-Icons/Architecture-Service-Icons_01312024/Arch_Containers/48/Arch_Amazon-Elastic-Container-Registry_48.svg"
+             data-desc="存放 ARM64 Drain Job 映像檔（同時標記 latest 與 git SHA），啟用 Scan-on-push 與過期映像清理規則。Batch 直接自 ECR 拉取，零跨雲憑證。">
+          <div class="node-icon">
+            <img src="aws-svg-icons/Architecture-Service-Icons/Architecture-Service-Icons_01312024/Arch_Containers/48/Arch_Amazon-Elastic-Container-Registry_48.svg" alt="Amazon ECR" />
+          </div>
+          <div class="node-body">
+            <div class="node-title">Amazon ECR</div>
+            <div class="node-sub">ARM64 Drain Image</div>
+            <span class="node-badge">Scan-on-push · TTL</span>
+          </div>
+        </div>
+
+        <div class="node t-security" style="left: 286px; top: 558px; width: 412px; height: 86px;"
+             data-flow="security inbound outbound"
+             data-title="AWS IAM / STS (Least-Privilege Roles)"
+             data-meta="AWS · Zero Static Access Keys"
+             data-icon="aws-svg-icons/Architecture-Service-Icons/Architecture-Service-Icons_01312024/Arch_Security-Identity-Compliance/48/Arch_AWS-Identity-and-Access-Management_48.svg"
+             data-desc="1) mailservice-batch-task-role：Batch 專屬最小權限（禁寫 TMP/），並作為 GCP WIF 信任契約 ARN。2) mailservice-pythonportal-role：僅允許 accounts.google.com OIDC WebIdentity 扮演，限讀 mail/、寫 folder=sent/ 與 SES 寄信。">
+          <div class="node-icon">
+            <img src="aws-svg-icons/Architecture-Service-Icons/Architecture-Service-Icons_01312024/Arch_Security-Identity-Compliance/48/Arch_AWS-Identity-and-Access-Management_48.svg" alt="AWS IAM" />
+          </div>
+          <div class="node-body">
+            <div class="node-title">AWS IAM / STS (Least-Privilege Roles)</div>
+            <div class="node-sub">mailservice-batch-task-role · mailservice-pythonportal-role (OIDC)</div>
+            <span class="node-badge">No Static Keys · Scoped Prefixes</span>
+          </div>
+        </div>
+
+        <div class="node t-cloud" style="left: 44px; top: 690px; width: 294px; height: 88px;"
+             data-flow="ops"
+             data-title="AWS CodePipeline + CodeBuild (ARM64)"
+             data-meta="AWS CI/CD · Push to main + Weekly Schedule"
+             data-icon="aws-svg-icons/Architecture-Service-Icons/Architecture-Service-Icons_01312024/Arch_Developer-Tools/48/Arch_AWS-CodePipeline_48.svg + Arch_AWS-CodeBuild_48.svg"
+             data-desc="由 GitHub Push（AWS 路徑）或每週排程觸發：先在原生 ARM_CONTAINER 建置並推送映像至 ECR，完成後才執行 terraform/aws apply。不持有任何 GCP 憑證。">
+          <div class="node-icon-stack">
+            <div class="node-icon">
+              <img src="aws-svg-icons/Architecture-Service-Icons/Architecture-Service-Icons_01312024/Arch_Developer-Tools/48/Arch_AWS-CodePipeline_48.svg" alt="CodePipeline" />
+            </div>
+            <div class="node-icon">
+              <img src="aws-svg-icons/Architecture-Service-Icons/Architecture-Service-Icons_01312024/Arch_Developer-Tools/48/Arch_AWS-CodeBuild_48.svg" alt="CodeBuild" />
+            </div>
+          </div>
+          <div class="node-body">
+            <div class="node-title">CodePipeline + CodeBuild</div>
+            <div class="node-sub">ARM64 Build → ECR → TF Apply</div>
+            <span class="node-badge">Weekly Rebuild · No GCP Creds</span>
+          </div>
+        </div>
+
+        <div class="node t-external" style="left: 364px; top: 690px; width: 334px; height: 88px;"
+             data-flow="ops"
+             data-title="CloudWatch + EventBridge + SNS"
+             data-meta="AWS Observability · mailservice-alarms"
+             data-icon="Arch_Amazon-CloudWatch_48.svg + Arch_Amazon-EventBridge_48.svg + Arch_Amazon-Simple-Notification-Service_48.svg"
+             data-desc="CloudWatch 告警監控 DLQ 非空（>0）與 Queue 訊息滯留（>3600s）；EventBridge 擷取 Batch Job FAILED 狀態變更事件；統一發布至 SNS Topic mailservice-alarms。">
+          <div class="node-icon-stack">
+            <div class="node-icon">
+              <img src="aws-svg-icons/Architecture-Service-Icons/Architecture-Service-Icons_01312024/Arch_Management-Governance/48/Arch_Amazon-CloudWatch_48.svg" alt="CloudWatch" />
+            </div>
+            <div class="node-icon">
+              <img src="aws-svg-icons/Architecture-Service-Icons/Architecture-Service-Icons_01312024/Arch_App-Integration/48/Arch_Amazon-EventBridge_48.svg" alt="EventBridge" />
+            </div>
+            <div class="node-icon">
+              <img src="aws-svg-icons/Architecture-Service-Icons/Architecture-Service-Icons_01312024/Arch_App-Integration/48/Arch_Amazon-Simple-Notification-Service_48.svg" alt="SNS" />
+            </div>
+          </div>
+          <div class="node-body">
+            <div class="node-title">CloudWatch + EventBridge + SNS</div>
+            <div class="node-sub">DLQ / Stale Alarms · Batch FAILED</div>
+            <span class="node-badge">Topic: mailservice-alarms</span>
+          </div>
+        </div>
+
+        <!-- ==================== GOOGLE CLOUD NODES ==================== -->
+        <div class="node t-backend" style="left: 778px; top: 190px; width: 292px; height: 86px;"
+             data-flow="outbound security"
+             data-title="pythonportal (Cloud Run · FastAPI)"
+             data-meta="GCP · Project: jp"
+             data-icon="gcp-svg-icons/Serverless Computing/SVG/ServerlessComputing-512-color.svg"
+             data-desc="公司主後端 API 服務的郵件模組：跨專案讀寫 mailservice Firestore，依 URI Scheme（s3:// / gs://）讀取郵件與附件，並經由 Google Workspace SMTP Relay（主）或 AWS SES（備）寄信。">
+          <div class="node-icon">
+            <img src="gcp-svg-icons/Serverless Computing/SVG/ServerlessComputing-512-color.svg" alt="Cloud Run" />
+          </div>
+          <div class="node-body">
+            <div class="node-title">pythonportal (Cloud Run)</div>
+            <div class="node-sub">FastAPI Mail Module (Cross-Project)</div>
+            <span class="node-badge">URI Dispatch: s3:// &amp; gs://</span>
+          </div>
+        </div>
+
+        <div class="node t-database" style="left: 1108px; top: 190px; width: 286px; height: 86px;"
+             data-flow="outbound"
+             data-title="GCS Relay-Sent Mail Bucket"
+             data-meta="GCP · us-west1 · SMTP Relay Archive"
+             data-icon="gcp-svg-icons/Storage/SVG/Storage-512-color.svg"
+             data-desc="存放經由 Google Workspace SMTP Relay 寄出的郵件原始檔、HTML 與附件（folder=sent），採用與 S3 相同的 Hive 分區格式。僅 pythonportal SA 具 objectAdmin 權限。">
+          <div class="node-icon">
+            <img src="gcp-svg-icons/Storage/SVG/Storage-512-color.svg" alt="Cloud Storage" />
+          </div>
+          <div class="node-body">
+            <div class="node-title">GCS Relay-Sent Bucket</div>
+            <div class="node-sub">gs://.../mail/*/folder=sent/</div>
+            <span class="node-badge">SMTP Relay 寄件備份</span>
+          </div>
+        </div>
+
+        <div class="node t-database" style="left: 778px; top: 344px; width: 192px; height: 98px;"
+             data-flow="inbound security"
+             data-title="GCS Ingest Bucket"
+             data-meta="GCP · us-west1 · j-serverless-mail-mail-ingest"
+             data-icon="gcp-svg-icons/Storage/SVG/Storage-512-color.svg"
+             data-desc="跨雲交接緩衝區：存放 incoming/<doc_id>.json。mailservice-batch-writer 僅具 objectCreator（禁讀/改/刪），mailservice-ingest-fn 具 objectUser，殘留檔案 30 天自動過期。">
+          <div class="node-icon">
+            <img src="gcp-svg-icons/Storage/SVG/Storage-512-color.svg" alt="GCS Ingest Bucket" />
+          </div>
+          <div class="node-body">
+            <div class="node-title">GCS Ingest Bucket</div>
+            <div class="node-sub">incoming/&lt;doc_id&gt;.json</div>
+            <span class="node-badge">Uniform Access · 30d TTL</span>
+          </div>
+        </div>
+
+        <div class="node t-bus" style="left: 1000px; top: 354px; width: 148px; height: 78px;"
+             data-flow="inbound"
+             data-title="GCP Eventarc Trigger"
+             data-meta="GCP · us-west1 · Cloud Storage Finalize Event"
+             data-icon="gcp-svg-icons/Integration Services/SVG/IntegrationServices-512-color.svg"
+             data-desc="監聽 Ingest Bucket 的 google.cloud.storage.object.v1.finalized 事件並以專用觸發 SA 呼叫 Cloud Run Function，暫時性失敗自動重試。">
+          <div class="node-icon">
+            <img src="gcp-svg-icons/Integration Services/SVG/IntegrationServices-512-color.svg" alt="Eventarc" />
+          </div>
+          <div class="node-body">
+            <div class="node-title">Eventarc</div>
+            <div class="node-sub">object.v1.finalized</div>
+          </div>
+        </div>
+
+        <div class="node t-backend" style="left: 1178px; top: 344px; width: 216px; height: 98px;"
+             data-flow="inbound ops"
+             data-title="Cloud Run Function (mailservice-ingest)"
+             data-meta="GCP · 2nd-gen · Python 3.12 · us-west1"
+             data-icon="gcp-svg-icons/Serverless Computing/SVG/ServerlessComputing-512-color.svg"
+             data-desc="驗證 Ingest Record JSON，冪等更新信箱註冊表並建立 mail 文件後刪除 JSON。永久性錯誤（格式不符）留存檔案並記錄錯誤觸發告警；可透過重新上傳手動 Replay。">
+          <div class="node-icon">
+            <img src="gcp-svg-icons/Serverless Computing/SVG/ServerlessComputing-512-color.svg" alt="Cloud Run Function" />
+          </div>
+          <div class="node-body">
+            <div class="node-title">mailservice-ingest</div>
+            <div class="node-sub">2nd-gen Fn · Py 3.12</div>
+            <span class="node-badge">Idempotent · SA Scoped</span>
+          </div>
+        </div>
+
+        <div class="node t-security" style="left: 778px; top: 506px; width: 266px; height: 110px;"
+             data-flow="security inbound"
+             data-title="GCP WIF + IAM + Secret Manager"
+             data-meta="GCP · Zero-Key Federation & Legacy Secret"
+             data-icon="gcp-svg-icons/Security Identity/SVG/SecurityIdentity-512-color.svg"
+             data-desc="WIF AWS Provider 僅信任 mailservice-batch-task-role，模擬 mailservice-batch-writer（僅 objectCreator）。Secret Manager 託管舊版 mailservice-ingest-api-key（僅 pythonportal 與 erp-dns-firewall 可讀）。">
+          <div class="node-icon">
+            <img src="gcp-svg-icons/Security Identity/SVG/SecurityIdentity-512-color.svg" alt="Security & Identity" />
+          </div>
+          <div class="node-body">
+            <div class="node-title">WIF + IAM + Secret Mgr</div>
+            <div class="node-sub">AWS Pool → batch-writer SA<br/>Secret: mailservice-ingest-api-key</div>
+            <span class="node-badge">Zero Static Keys</span>
+          </div>
+        </div>
+
+        <div class="node t-database" style="left: 1078px; top: 506px; width: 316px; height: 110px;"
+             data-flow="inbound outbound"
+             data-title="Cloud Firestore (Enterprise · Native)"
+             data-meta="GCP · us-west1 · DB: mailservice"
+             data-icon="gcp-svg-icons/Databases/SVG/Databases-512-color.svg"
+             data-desc="Enterprise Native 模式（原生支援全文檢索索引，停用 MongoDB 模式）。存放 {env}_mail 與 {env}_mail_mailbox（如 staging_mail），文件 ID 格式：<mailbox~path>~<folder>~<message_id>。">
+          <div class="node-icon">
+            <img src="gcp-svg-icons/Databases/SVG/Databases-512-color.svg" alt="Cloud Firestore" />
+          </div>
+          <div class="node-body">
+            <div class="node-title">Cloud Firestore (Enterprise)</div>
+            <div class="node-sub">DB: mailservice (Native · FTS)<br/>{env}_mail &amp; {env}_mail_mailbox</div>
+            <span class="node-badge">deletion_policy = PREVENT</span>
+          </div>
+        </div>
+
+        <div class="node t-cloud" style="left: 778px; top: 690px; width: 292px; height: 88px;"
+             data-flow="ops"
+             data-title="GCP Cloud Build (2nd-gen)"
+             data-meta="GCP CI/CD · Protected Terraform Apply"
+             data-icon="gcp-svg-icons/DevOps/SVG/DevOps-512-color.svg"
+             data-desc="監聽 terraform/gcp/**、src/ingest_function/**、cloudbuild.yaml。強制執行 terraform test 與 check_plan.py，阻擋非白名單資源刪除或重建。不持有任何 AWS 憑證。">
+          <div class="node-icon">
+            <img src="gcp-svg-icons/DevOps/SVG/DevOps-512-color.svg" alt="Cloud Build" />
+          </div>
+          <div class="node-body">
+            <div class="node-title">Cloud Build (2nd-gen)</div>
+            <div class="node-sub">TF Test → check_plan.py → Apply</div>
+            <span class="node-badge">Delete Guard · No AWS Creds</span>
+          </div>
+        </div>
+
+        <div class="node t-external" style="left: 1100px; top: 690px; width: 294px; height: 88px;"
+             data-flow="ops"
+             data-title="Cloud Monitoring & Alerting"
+             data-meta="GCP Observability · Log-Based Metric"
+             data-icon="gcp-svg-icons/Observability/SVG/Observability-512-color.svg"
+             data-desc="透過 Log-based Metric 計算 mailservice-ingest 錯誤日誌（包含永久性 Schema 失敗與執行例外），觸發告警策略並寄送 Email 通知維運人員。">
+          <div class="node-icon">
+            <img src="gcp-svg-icons/Observability/SVG/Observability-512-color.svg" alt="Cloud Monitoring" />
+          </div>
+          <div class="node-body">
+            <div class="node-title">Cloud Monitoring &amp; Alerts</div>
+            <div class="node-sub">Log-based Metric on Ingest Errors</div>
+            <span class="node-badge">Email Notification Channel</span>
+          </div>
+        </div>
+
+        <!-- ==================== LEGEND (Outside All Boundaries) ==================== -->
+        <div class="legend-bar">
+          <div class="legend-row">
+            <span style="font-weight:700; color:#f8fafc;">元件語意配色：</span>
+            <span class="legend-item"><span class="swatch" style="background:var(--cyan-bg); border-color:var(--cyan);"></span>前端 / UI</span>
+            <span class="legend-item"><span class="swatch" style="background:var(--emerald-bg); border-color:var(--emerald);"></span>運算 / 後端</span>
+            <span class="legend-item"><span class="swatch" style="background:var(--violet-bg); border-color:var(--violet);"></span>儲存 / 資料庫</span>
+            <span class="legend-item"><span class="swatch" style="background:var(--orange-bg); border-color:var(--orange);"></span>佇列 / 事件匯流排</span>
+            <span class="legend-item"><span class="swatch" style="background:var(--rose-bg); border-color:var(--rose);"></span>安全 / IAM / WIF</span>
+            <span class="legend-item"><span class="swatch" style="background:var(--amber-bg); border-color:var(--amber);"></span>雲端基礎 / CI/CD</span>
+            <span class="legend-item"><span class="swatch" style="background:var(--slate-bg); border-color:#cbd5e1;"></span>獨立 / 非 AWS・GCP 服務（無圖示圓角框）</span>
+          </div>
+          <div class="legend-row">
+            <span style="font-weight:700; color:#f8fafc;">連線資料流向：</span>
+            <span class="legend-item"><span class="line-sample" style="border-color:var(--emerald);"></span>收信資料流（Inbound）</span>
+            <span class="legend-item"><span class="line-sample" style="border-color:var(--orange);"></span>SQS 指標佇列</span>
+            <span class="legend-item"><span class="line-sample" style="border-color:var(--cyan);"></span>寄信與讀取流（Outbound / Read）</span>
+            <span class="legend-item"><span class="line-sample line-dashed" style="border-color:var(--rose);"></span>跨雲無金鑰驗證（WIF / OIDC）</span>
+            <span class="legend-item"><span class="line-sample line-dashed" style="border-color:var(--amber);"></span>CI/CD 部署與映像拉取</span>
+            <span class="legend-item"><span class="line-sample line-dashed" style="border-color:var(--slate);"></span>監控告警事件</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Interactive Component Inspector -->
+    <div class="inspector" id="inspector">
+      <div>
+        <div class="inspector-title" id="insp-title">👆 點擊架構圖中任一元件以檢視詳細規格與 IAM 邊界</div>
+        <div class="inspector-meta" id="insp-meta">支援上方流程按鈕篩選（收信 / 寄信與讀取 / 跨雲 WIF / CI-CD 與監控）</div>
+        <div class="inspector-desc" id="insp-desc">本架構採 AWS + GCP 雙雲無伺服器設計，AWS 負責收信、防毒掃描與長期 Hive 物件封存，GCP 負責事件驅動 Metadata 寫入與 Enterprise Firestore 全文索引查詢；跨雲驗證全程無靜態金鑰。</div>
+      </div>
+      <div class="inspector-icon-path" id="insp-icon">Icon: Relative SVG Path from architecture_icons/</div>
+    </div>
+
+    <!-- 3 Summary Cards -->
+    <div class="cards-grid">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-dot dot-emerald"></div>
+          <h3>📥 端對端收信與淨化管線</h3>
+        </div>
+        <ul>
+          <li>• <strong>零 VPC / 零 NAT 成本</strong>：Lambda 無 VPC，Batch 執行於 Public Subnet 的 ARM64 Fargate Spot。</li>
+          <li>• <strong>雙重防毒與垃圾信防護</strong>：單一容器整合 Rspamd（無狀態評分）與 ClamAV（S3 快取特徵庫，無庫時 Fail-Closed 保護）。</li>
+          <li>• <strong>雙層 XSS 防護</strong>：Batch 預先淨化 `.html` 本文，`staffportal-frontend` 再以沙盒化 `&lt;iframe&gt;` 獨立隔離渲染。</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-dot dot-rose"></div>
+          <h3>🔐 跨雲無金鑰信任邊界（Zero Static Keys）</h3>
+        </div>
+        <ul>
+          <li>• <strong>AWS → GCP WIF</strong>：Batch 透過 `mailservice-batch-task-role` 換取 GCP 短期權杖，僅具 Ingest Bucket `objectCreator` 權限。</li>
+          <li>• <strong>GCP → AWS OIDC</strong>：`pythonportal` 以 Cloud Run SA ID Token 扮演 `mailservice-pythonportal-role`，僅可讀 `mail/` 與寫 `folder=sent/`。</li>
+          <li>• <strong>雙雲 CI 隔離</strong>：AWS CodePipeline 與 GCP Cloud Build 各自獨立且不交叉持有對方雲端憑證。</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-dot dot-amber"></div>
+          <h3>🗂️ 統一 Hive 儲存模型與防誤刪護欄</h3>
+        </div>
+        <ul>
+          <li>• <strong>跨雲一致分區</strong>：`mail/&lt;type&gt;/dt=YYYY-MM-DD/mailbox=&lt;~路徑&gt;/folder=&lt;folder&gt;/`，支援未來無痛導入 Athena / BigQuery。</li>
+          <li>• <strong>Scheme URI 路由</strong>：Firestore 紀錄完整 `s3://` 與 `gs://` URI，讀取端依前綴動態切換儲存客戶端。</li>
+          <li>• <strong>CI 破壞變更保護</strong>：GCP Cloud Build 透過 `check_plan.py` 阻擋非白名單資源的 delete/replace；Firestore Index 設為 `PREVENT`。</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <span>Repository: jp/j-serverless-mailservice (main)</span>
+      <span>Icons: architecture_icons/{aws-svg-icons, gcp-svg-icons} · Generated with /architecture-diagram design system</span>
+    </div>
+  </div>
+
+  <script>
+    // Flow filter buttons
+    const filterButtons = document.querySelectorAll('.filter-btn');
+    const nodes = document.querySelectorAll('.node');
+    const edges = document.querySelectorAll('.edge-path, .edge-label-group');
+
+    filterButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        filterButtons.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const filter = btn.dataset.filter;
+
+        nodes.forEach(n => {
+          const flows = (n.dataset.flow || '').split(' ');
+          n.classList.toggle('dimmed', filter !== 'all' && !flows.includes(filter));
+        });
+
+        edges.forEach(e => {
+          const flows = (e.dataset.flow || '').split(' ');
+          e.classList.toggle('dimmed', filter !== 'all' && !flows.includes(filter));
+        });
+      });
+    });
+
+    // Interactive Node Inspector
+    nodes.forEach(node => {
+      node.addEventListener('click', () => {
+        nodes.forEach(n => n.classList.remove('selected'));
+        node.classList.add('selected');
+        document.getElementById('insp-title').textContent = node.dataset.title || '';
+        document.getElementById('insp-meta').textContent = node.dataset.meta || '';
+        document.getElementById('insp-desc').textContent = node.dataset.desc || '';
+        document.getElementById('insp-icon').textContent = 'Icon: ' + (node.dataset.icon || '');
+      });
+    });
+
+    // Export Toolbar
+    function toggleToolbar() {
+      document.getElementById('export-toolbar').classList.toggle('open');
+    }
+
+    async function captureDiagram() {
+      const target = document.getElementById('report-container');
+      const rect = target.getBoundingClientRect();
+      const pad = 24;
+      return html2canvas(document.body, {
+        backgroundColor: '#020617',
+        scale: 2,
+        useCORS: true,
+        x: Math.max(0, rect.left + window.scrollX - pad),
+        y: Math.max(0, rect.top + window.scrollY - pad),
+        width: rect.width + pad * 2,
+        height: rect.height + pad * 2,
+        ignoreElements: el => el.classList && (el.classList.contains('toolbar') || el.classList.contains('filter-bar'))
+      });
+    }
+
+    async function copyAsImage() {
+      try {
+        const canvas = await captureDiagram();
+        canvas.toBlob(async blob => {
+          await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+          alert('已將高解析度 PNG 架構圖複製到剪貼簿！');
+        });
+      } catch (err) {
+        alert('複製失敗（瀏覽器需於 https 或 localhost 環境執行），請改用 PNG 下載。');
+      }
+    }
+
+    async function downloadPNG() {
+      const canvas = await captureDiagram();
+      const link = document.createElement('a');
+      link.download = 'j-serverless-mailservice-architecture.png';
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    }
+
+    async function downloadPDF() {
+      const canvas = await captureDiagram();
+      const imgData = canvas.toDataURL('image/png');
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF({
+        orientation: canvas.width > canvas.height ? 'landscape' : 'portrait',
+        unit: 'px',
+        format: [canvas.width / 2, canvas.height / 2]
+      });
+      pdf.addImage(imgData, 'PNG', 0, 0, canvas.width / 2, canvas.height / 2);
+      pdf.save('j-serverless-mailservice-architecture.pdf');
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,1247 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>j PDM/PLM 混合雲系統架構圖</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js" integrity="sha384-ZZ1pncU3bQe8y31yfZdMFdSpttDoPmOZg2wguVK9almUodir1PghgT0eY7Mrty8H" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js" integrity="sha384-en/ztfPSRkGfME4KIm05joYXynqzUgbsG5nMrj/xEFAHXkeZfO3yMK8QQ+mP7p1/" crossorigin="anonymous"></script>
+  <style>
+    :root {
+      --bg-canvas: #020617;
+      --bg-card: #0f172a;
+      --bg-elevated: #1e293b;
+      --border-subtle: #334155;
+      --text-primary: #f8fafc;
+      --text-secondary: #cbd5e1;
+      --text-muted: #94a3b8;
+      --cyan: #22d3ee;
+      --emerald: #34d399;
+      --violet: #a78bfa;
+      --amber: #fbbf24;
+      --rose: #fb7185;
+      --orange: #fb923c;
+      --slate: #94a3b8;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg-canvas);
+      color: var(--text-primary);
+      font-family: 'JetBrains Mono', 'Noto Sans TC', monospace, sans-serif;
+      min-height: 100vh;
+      padding: 24px;
+      line-height: 1.5;
+    }
+
+    .container {
+      max-width: 1340px;
+      margin: 0 auto;
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+      margin-bottom: 18px;
+      flex-wrap: wrap;
+    }
+
+    .title-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .title-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .pulse-dot {
+      width: 11px;
+      height: 11px;
+      border-radius: 50%;
+      background: var(--emerald);
+      box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.7);
+      animation: pulse 2s infinite;
+      flex-shrink: 0;
+    }
+
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.7); }
+      70% { box-shadow: 0 0 0 10px rgba(52, 211, 153, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0); }
+    }
+
+    h1 {
+      font-size: 20px;
+      font-weight: 700;
+      color: #ffffff;
+      letter-spacing: -0.3px;
+    }
+
+    .subtitle {
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    /* Export Toolbar */
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      position: relative;
+    }
+
+    .toolbar-actions {
+      display: none;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .toolbar.open .toolbar-actions {
+      display: flex;
+    }
+
+    .toolbar-btn, .toolbar-toggle {
+      background: var(--bg-card);
+      color: var(--text-primary);
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      padding: 6px 12px;
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .toolbar-btn:hover, .toolbar-toggle:hover {
+      border-color: var(--cyan);
+      background: var(--bg-elevated);
+    }
+
+    @media print {
+      .toolbar, .controls-bar { display: none !important; }
+    }
+
+    /* Interactive Filter Controls */
+    .controls-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 14px;
+      padding: 10px 14px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 10px;
+    }
+
+    .filter-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .filter-label {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-secondary);
+      margin-right: 4px;
+    }
+
+    .filter-btn {
+      background: rgba(15, 23, 42, 0.9);
+      color: var(--text-secondary);
+      border: 1px solid #475569;
+      border-radius: 999px;
+      padding: 5px 12px;
+      font-family: inherit;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .filter-btn:hover {
+      color: #ffffff;
+      border-color: var(--cyan);
+    }
+
+    .filter-btn.active {
+      background: rgba(34, 211, 238, 0.2);
+      color: #ffffff;
+      border-color: var(--cyan);
+      box-shadow: 0 0 12px rgba(34, 211, 238, 0.25);
+    }
+
+    .hint-text {
+      font-size: 11px;
+      color: var(--amber);
+      font-weight: 500;
+    }
+
+    /* Diagram Card */
+    .diagram-card {
+      background: var(--bg-canvas);
+      border: 1px solid var(--border-subtle);
+      border-radius: 14px;
+      overflow-x: auto;
+      position: relative;
+      box-shadow: 0 20px 45px rgba(0, 0, 0, 0.55);
+    }
+
+    .diagram-stage {
+      position: relative;
+      width: 1290px;
+      height: 830px;
+      margin: 0 auto;
+    }
+
+    .diagram-svg {
+      position: absolute;
+      inset: 0;
+      width: 1290px;
+      height: 830px;
+      pointer-events: none;
+    }
+
+    /* Nodes Layer */
+    .nodes-layer {
+      position: absolute;
+      inset: 0;
+      width: 1290px;
+      height: 830px;
+    }
+
+    .node {
+      position: absolute;
+      border-radius: 8px;
+      padding: 10px 12px;
+      cursor: pointer;
+      transition: transform 0.16s ease, box-shadow 0.16s ease, opacity 0.2s ease, border-color 0.16s ease;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      background-color: #0f172a; /* Opaque mask so arrows never bleed through */
+    }
+
+    .node::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border-radius: 7px;
+      pointer-events: none;
+    }
+
+    .node > * { position: relative; z-index: 1; }
+
+    .node:hover, .node.selected {
+      transform: translateY(-2px);
+      z-index: 20;
+    }
+
+    .node.dimmed {
+      opacity: 0.22;
+    }
+
+    /* Semantic Node Themes (High Contrast) */
+    .node.frontend { border: 1.5px solid var(--cyan); }
+    .node.frontend::before { background: rgba(8, 51, 68, 0.52); }
+    .node.frontend:hover, .node.frontend.selected { box-shadow: 0 0 0 2px rgba(34, 211, 238, 0.45), 0 8px 24px rgba(34, 211, 238, 0.2); }
+
+    .node.backend { border: 1.5px solid var(--emerald); }
+    .node.backend::before { background: rgba(6, 78, 59, 0.52); }
+    .node.backend:hover, .node.backend.selected { box-shadow: 0 0 0 2px rgba(52, 211, 153, 0.45), 0 8px 24px rgba(52, 211, 153, 0.2); }
+
+    .node.database { border: 1.5px solid var(--violet); }
+    .node.database::before { background: rgba(76, 29, 149, 0.52); }
+    .node.database:hover, .node.database.selected { box-shadow: 0 0 0 2px rgba(167, 139, 250, 0.45), 0 8px 24px rgba(167, 139, 250, 0.2); }
+
+    .node.cloud { border: 1.5px solid var(--amber); }
+    .node.cloud::before { background: rgba(120, 53, 15, 0.42); }
+    .node.cloud:hover, .node.cloud.selected { box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.45), 0 8px 24px rgba(251, 191, 36, 0.2); }
+
+    .node.security { border: 1.5px solid var(--rose); }
+    .node.security::before { background: rgba(136, 19, 55, 0.5); }
+    .node.security:hover, .node.security.selected { box-shadow: 0 0 0 2px rgba(251, 113, 133, 0.45), 0 8px 24px rgba(251, 113, 133, 0.2); }
+
+    .node.ml { border: 1.5px solid var(--orange); }
+    .node.ml::before { background: rgba(154, 52, 18, 0.42); }
+    .node.ml:hover, .node.ml.selected { box-shadow: 0 0 0 2px rgba(251, 146, 60, 0.45), 0 8px 24px rgba(251, 146, 60, 0.2); }
+
+    .node.external { border: 1.5px solid #cbd5e1; }
+    .node.external::before { background: rgba(30, 41, 59, 0.72); }
+    .node.external:hover, .node.external.selected { box-shadow: 0 0 0 2px rgba(203, 213, 225, 0.45), 0 8px 24px rgba(148, 163, 184, 0.2); }
+
+    .node-head {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .icon-frame {
+      width: 38px;
+      height: 38px;
+      border-radius: 8px;
+      background: rgba(248, 250, 252, 0.96);
+      padding: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+    }
+
+    .icon-frame img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+    }
+
+    .icon-fallback {
+      font-size: 10px;
+      font-weight: 700;
+      color: #0f172a;
+      display: none;
+    }
+
+    .node-titles {
+      min-width: 0;
+      flex: 1;
+    }
+
+    .node-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: #ffffff;
+      line-height: 1.3;
+    }
+
+    .node-sub {
+      font-size: 10px;
+      color: #e2e8f0;
+      margin-top: 2px;
+      line-height: 1.35;
+    }
+
+    .badge-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-top: 7px;
+    }
+
+    .pill {
+      font-size: 9.5px;
+      font-weight: 600;
+      padding: 2px 6px;
+      border-radius: 4px;
+      background: rgba(2, 6, 23, 0.78);
+      border: 1px solid rgba(203, 213, 225, 0.35);
+      color: #f1f5f9;
+      white-space: nowrap;
+    }
+
+    .pill.cyan { border-color: var(--cyan); color: #67e8f9; }
+    .pill.emerald { border-color: var(--emerald); color: #6ee7b7; }
+    .pill.violet { border-color: var(--violet); color: #ddd6fe; }
+    .pill.amber { border-color: var(--amber); color: #fde68a; }
+    .pill.rose { border-color: var(--rose); color: #fecdd3; }
+    .pill.orange { border-color: var(--orange); color: #fed7aa; }
+
+    /* SVG Edges */
+    .edge-group { transition: opacity 0.2s ease; }
+    .edge-group.dimmed { opacity: 0.14; }
+    .edge-label-bg { fill: #0f172a; stroke-width: 1; rx: 4; }
+
+    /* Inspector Panel */
+    .inspector {
+      margin-top: 16px;
+      background: var(--bg-card);
+      border: 1px solid var(--cyan);
+      border-radius: 12px;
+      padding: 16px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+
+    .inspector-main { flex: 1; min-width: 280px; }
+    .inspector-badge {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: rgba(34, 211, 238, 0.2);
+      color: #67e8f9;
+      border: 1px solid var(--cyan);
+      margin-bottom: 6px;
+    }
+    .inspector h2 { font-size: 15px; color: #ffffff; margin-bottom: 6px; }
+    .inspector p { font-size: 12px; color: var(--text-secondary); }
+    .inspector-meta {
+      min-width: 280px;
+      max-width: 460px;
+      background: rgba(2, 6, 23, 0.7);
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 11px;
+      color: #e2e8f0;
+    }
+    .inspector-meta div { margin-bottom: 4px; }
+    .inspector-meta strong { color: var(--amber); }
+
+    /* Summary Cards */
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-top: 18px;
+    }
+
+    @media (max-width: 960px) {
+      .cards-grid { grid-template-columns: 1fr; }
+    }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      padding: 16px 18px;
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .card-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .card-dot.cyan { background: var(--cyan); }
+    .card-dot.violet { background: var(--violet); }
+    .card-dot.amber { background: var(--amber); }
+
+    .card h3 {
+      font-size: 13px;
+      font-weight: 700;
+      color: #ffffff;
+    }
+
+    .card ul {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .card li {
+      font-size: 11.5px;
+      color: var(--text-secondary);
+    }
+
+    .card li strong {
+      color: #ffffff;
+    }
+
+    /* Footer */
+    .footer {
+      margin-top: 18px;
+      padding-top: 12px;
+      border-top: 1px solid #1e293b;
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 8px;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+  </style>
+</head>
+<body>
+  <div id="report-container" class="container">
+    <!-- Header -->
+    <div class="header">
+      <div class="title-wrap">
+        <div class="title-row">
+          <span class="pulse-dot"></span>
+          <h1>j PDM/PLM 混合雲系統架構圖</h1>
+        </div>
+        <div class="subtitle">
+          Repo: jp/j-pdmplm · 應用層 (us-west1 Shared VPC) ＋ 資料湖專案 (asia-east1 台灣區) ＋ 地端 MSSQL ERP [XTABLENAME]
+        </div>
+      </div>
+
+      <!-- Export Toolbar -->
+      <div class="toolbar" id="export-toolbar">
+        <div class="toolbar-actions">
+          <button class="toolbar-btn" onclick="copyAsImage()">📋 Copy</button>
+          <button class="toolbar-btn" onclick="downloadPNG()">🖼️ PNG</button>
+          <button class="toolbar-btn" onclick="downloadPDF()">📄 PDF</button>
+        </div>
+        <button class="toolbar-toggle" onclick="toggleToolbar()" title="匯出架構圖">⋯</button>
+      </div>
+    </div>
+
+    <!-- Interactive Flow Filter -->
+    <div class="controls-bar">
+      <div class="filter-group">
+        <span class="filter-label">互動路徑篩選：</span>
+        <button class="filter-btn active" data-flow="all">全部顯示</button>
+        <button class="filter-btn" data-flow="api">① 輕量 API / MCP 路徑</button>
+        <button class="filter-btn" data-flow="direct">② 零跨洲 V4 Signed URL 圖檔直連</button>
+        <button class="filter-btn" data-flow="erp">③ 地端 NAS 與 MSSQL ERP 兩階段寫入</button>
+        <button class="filter-btn" data-flow="analytics">④ 資料湖 / ML 向量檢索 / Trino 聯查</button>
+      </div>
+      <div class="hint-text">💡 點擊任一元件方塊可檢視詳細技術規格與 ADR 依據</div>
+    </div>
+
+    <!-- Main Interactive Diagram -->
+    <div class="diagram-card">
+      <div class="diagram-stage">
+        <!-- SVG Layer: Background Grid, Region Boundaries, Connection Arrows, Legend -->
+        <svg class="diagram-svg" viewBox="0 0 1290 830" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+              <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" stroke-width="0.6" />
+            </pattern>
+            <marker id="arrow-cyan" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+              <polygon points="0 0, 10 3.5, 0 7" fill="#22d3ee" />
+            </marker>
+            <marker id="arrow-emerald" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+              <polygon points="0 0, 10 3.5, 0 7" fill="#34d399" />
+            </marker>
+            <marker id="arrow-violet" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+              <polygon points="0 0, 10 3.5, 0 7" fill="#a78bfa" />
+            </marker>
+            <marker id="arrow-amber" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+              <polygon points="0 0, 10 3.5, 0 7" fill="#fbbf24" />
+            </marker>
+            <marker id="arrow-rose" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+              <polygon points="0 0, 10 3.5, 0 7" fill="#fb7185" />
+            </marker>
+            <marker id="arrow-orange" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+              <polygon points="0 0, 10 3.5, 0 7" fill="#fb923c" />
+            </marker>
+            <marker id="arrow-slate" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+              <polygon points="0 0, 10 3.5, 0 7" fill="#cbd5e1" />
+            </marker>
+          </defs>
+
+          <!-- Background Grid -->
+          <rect width="1290" height="830" fill="#020617" />
+          <rect width="1290" height="830" fill="url(#grid)" />
+
+          <!-- Region & Security Group Boundaries -->
+          <!-- Left Top: Taiwan Client & Local Tools -->
+          <rect x="20" y="48" width="290" height="368" rx="12" fill="rgba(8, 51, 68, 0.14)" stroke="#22d3ee" stroke-width="1.5" stroke-dasharray="8,4" />
+          <text x="34" y="68" fill="#67e8f9" font-size="11" font-weight="700">使用者與本地 MCP / 編譯工具</text>
+
+          <!-- Left Bottom: On-Premises Factory -->
+          <rect x="20" y="434" width="290" height="314" rx="12" fill="rgba(30, 41, 59, 0.22)" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="8,4" />
+          <text x="34" y="454" fill="#e2e8f0" font-size="11" font-weight="700">地端廠區環境 (On-Premises)</text>
+
+          <!-- Center: GCP us-west1 Application Project -->
+          <rect x="366" y="48" width="424" height="700" rx="12" fill="rgba(120, 53, 15, 0.1)" stroke="#fbbf24" stroke-width="1.8" stroke-dasharray="8,4" />
+          <text x="382" y="68" fill="#fde68a" font-size="11" font-weight="700">GCP us-west1 · 既有應用專案 (j-staffportal)</text>
+
+          <!-- Center Inner: Shared VPC Security Boundary -->
+          <rect x="382" y="82" width="392" height="492" rx="10" fill="rgba(136, 19, 55, 0.08)" stroke="#fb7185" stroke-width="1.4" stroke-dasharray="4,4" />
+          <text x="396" y="100" fill="#fda4af" font-size="10" font-weight="700">Security Boundary · j-shared-vpc (INTERNAL_ONLY)</text>
+
+          <!-- Right: GCP asia-east1 Independent PDM Data Project -->
+          <rect x="846" y="48" width="424" height="700" rx="12" fill="rgba(120, 53, 15, 0.1)" stroke="#fbbf24" stroke-width="1.8" stroke-dasharray="8,4" />
+          <text x="862" y="68" fill="#fde68a" font-size="11" font-weight="700">GCP asia-east1 (台灣區) · 獨立 PDM/PLM 資料專案</text>
+
+          <!-- ==================== CONNECTION ARROWS ==================== -->
+
+          <!-- Flow 2 (Direct): Browser -> GCS asia-east1 via V4 Signed URL (Top Corridor) -->
+          <g class="edge-group" data-flows="all direct">
+            <path d="M 165 82 L 165 20 L 1058 20 L 1058 84" fill="none" stroke="#fb923c" stroke-width="2.6" marker-end="url(#arrow-orange)" />
+            <rect x="430" y="9" width="388" height="22" class="edge-label-bg" stroke="#fb923c" />
+            <text x="624" y="24" fill="#fed7aa" font-size="10.5" font-weight="700" text-anchor="middle">② V4 Signed URL 瀏覽器直連 GCS (MB 級 · 零跨洲流量 · pdf-lib 浮水印)</text>
+          </g>
+
+          <!-- Flow 1 (API): Browser -> Gateway -->
+          <g class="edge-group" data-flows="all api">
+            <path d="M 294 128 L 336 128 L 336 196 L 396 196" fill="none" stroke="#22d3ee" stroke-width="2" marker-end="url(#arrow-cyan)" />
+            <rect x="304" y="148" width="76" height="20" class="edge-label-bg" stroke="#22d3ee" />
+            <text x="342" y="161" fill="#67e8f9" font-size="9.5" font-weight="700" text-anchor="middle">① RESTAPI</text>
+          </g>
+
+          <!-- Flow 1 (API/MCP): MCP Client -> Gateway -->
+          <g class="edge-group" data-flows="all api erp">
+            <path d="M 294 242 L 348 242 L 348 214 L 396 214" fill="none" stroke="#fb7185" stroke-width="1.8" stroke-dasharray="5,3" marker-end="url(#arrow-rose)" />
+            <rect x="304" y="250" width="84" height="19" class="edge-label-bg" stroke="#fb7185" />
+            <text x="346" y="263" fill="#fecdd3" font-size="9" font-weight="700" text-anchor="middle">MCP Bearer</text>
+          </g>
+
+          <!-- Flow 1 (API): Gateway -> Cloud Run -->
+          <g class="edge-group" data-flows="all api erp">
+            <path d="M 578 250 L 578 286" fill="none" stroke="#34d399" stroke-width="2" marker-end="url(#arrow-emerald)" />
+            <rect x="504" y="258" width="148" height="18" class="edge-label-bg" stroke="#34d399" />
+            <text x="578" y="270" fill="#6ee7b7" font-size="9" font-weight="700" text-anchor="middle">Nginx → Internal Ingress</text>
+          </g>
+
+          <!-- Flow 2 (Direct/Auth): Cloud Run -> IAM -> GCS -->
+          <g class="edge-group" data-flows="all direct api">
+            <path d="M 578 462 L 578 492" fill="none" stroke="#fb7185" stroke-width="1.8" stroke-dasharray="4,3" marker-end="url(#arrow-rose)" />
+            <path d="M 760 526 L 814 526 L 814 176 L 866 176" fill="none" stroke="#fb7185" stroke-width="1.8" stroke-dasharray="5,3" marker-end="url(#arrow-rose)" />
+            <rect x="768" y="200" width="96" height="20" class="edge-label-bg" stroke="#fb7185" />
+            <text x="816" y="213" fill="#fecdd3" font-size="9" font-weight="700" text-anchor="middle">signBlob URL</text>
+          </g>
+
+          <!-- Flow 1 & 4: Cloud Run -> GCS (Archive / Relocate) -->
+          <g class="edge-group" data-flows="all api analytics">
+            <path d="M 760 330 L 802 330 L 802 146 L 866 146" fill="none" stroke="#34d399" stroke-width="2" marker-end="url(#arrow-emerald)" />
+            <rect x="764" y="114" width="98" height="20" class="edge-label-bg" stroke="#34d399" />
+            <text x="813" y="127" fill="#6ee7b7" font-size="9" font-weight="700" text-anchor="middle">Hive 歸檔寫入</text>
+          </g>
+
+          <!-- Flow 1 & 4: Cloud Run -> Firestore Enterprise -->
+          <g class="edge-group" data-flows="all api analytics">
+            <path d="M 760 368 L 866 368" fill="none" stroke="#a78bfa" stroke-width="2.2" marker-end="url(#arrow-violet)" />
+            <rect x="766" y="346" width="94" height="19" class="edge-label-bg" stroke="#a78bfa" />
+            <text x="813" y="359" fill="#ddd6fe" font-size="9" font-weight="700" text-anchor="middle">PyMongo &lt;4KiB</text>
+          </g>
+
+          <!-- Flow 3 (ERP): NAS -> MCP Client -->
+          <g class="edge-group" data-flows="all erp">
+            <path d="M 165 468 L 165 424 L 46 424 L 46 284" fill="none" stroke="#cbd5e1" stroke-width="1.6" stroke-dasharray="4,3" marker-end="url(#arrow-slate)" />
+          </g>
+
+          <!-- Flow 3 (ERP): Schema Compiler -> Cloud Run -->
+          <g class="edge-group" data-flows="all erp">
+            <path d="M 294 360 L 396 360" fill="none" stroke="#cbd5e1" stroke-width="1.8" stroke-dasharray="5,3" marker-end="url(#arrow-slate)" />
+            <rect x="304" y="338" width="84" height="19" class="edge-label-bg" stroke="#cbd5e1" />
+            <text x="346" y="351" fill="#f1f5f9" font-size="9" font-weight="700" text-anchor="middle">.html Schema</text>
+          </g>
+
+          <!-- Flow 3 (ERP): Cloud Run -> WireGuard Tunnel -> MSSQL ERP -->
+          <g class="edge-group" data-flows="all erp">
+            <path d="M 442 462 L 442 588" fill="none" stroke="#a78bfa" stroke-width="2" marker-end="url(#arrow-violet)" />
+            <path d="M 382 618 L 296 618" fill="none" stroke="#a78bfa" stroke-width="2.2" marker-end="url(#arrow-violet)" />
+            <rect x="302" y="592" width="76" height="20" class="edge-label-bg" stroke="#a78bfa" />
+            <text x="340" y="605" fill="#ddd6fe" font-size="9" font-weight="700" text-anchor="middle">VPN 9表Tx</text>
+          </g>
+
+          <!-- Flow 4 (Analytics): GCS -> BigQuery -->
+          <g class="edge-group" data-flows="all analytics">
+            <path d="M 1248 168 L 1262 168 L 1262 522 L 1250 522" fill="none" stroke="#fbbf24" stroke-width="2" marker-end="url(#arrow-amber)" />
+            <rect x="1156" y="446" width="102" height="19" class="edge-label-bg" stroke="#fbbf24" />
+            <text x="1207" y="459" fill="#fde68a" font-size="9" font-weight="700" text-anchor="middle">External Tables</text>
+          </g>
+
+          <!-- Flow 4 (Analytics): ML -> BigQuery -->
+          <g class="edge-group" data-flows="all analytics">
+            <path d="M 1058 618 L 1058 588" fill="none" stroke="#fb923c" stroke-width="2" stroke-dasharray="4,3" marker-end="url(#arrow-orange)" />
+            <rect x="974" y="594" width="168" height="18" class="edge-label-bg" stroke="#fb923c" />
+            <text x="1058" y="606" fill="#fed7aa" font-size="9" font-weight="700" text-anchor="middle">Parquet → VECTOR_SEARCH</text>
+          </g>
+
+          <!-- Flow 4 (Analytics): Trino -> Firestore & BigQuery -->
+          <g class="edge-group" data-flows="all analytics">
+            <path d="M 294 714 L 826 714 L 826 406 L 866 406" fill="none" stroke="#fb923c" stroke-width="1.8" stroke-dasharray="5,4" marker-end="url(#arrow-orange)" />
+            <path d="M 826 544 L 866 544" fill="none" stroke="#fb923c" stroke-width="1.8" stroke-dasharray="5,4" marker-end="url(#arrow-orange)" />
+            <rect x="520" y="704" width="230" height="20" class="edge-label-bg" stroke="#fb923c" />
+            <text x="635" y="717" fill="#fed7aa" font-size="9.5" font-weight="700" text-anchor="middle">Trino 跨庫聯查 (唯讀 SCRAM / BQ)</text>
+          </g>
+
+          <!-- ==================== LEGEND (Outside all boundaries: y=770) ==================== -->
+          <g transform="translate(20, 768)">
+            <rect x="0" y="0" width="1250" height="44" rx="8" fill="#0f172a" stroke="#334155" stroke-width="1.2" />
+            <text x="16" y="26" fill="#f8fafc" font-size="11" font-weight="700">圖例 LEGEND：</text>
+
+            <rect x="115" y="15" width="14" height="14" rx="3" fill="rgba(8, 51, 68, 0.8)" stroke="#22d3ee" stroke-width="1.5" />
+            <text x="135" y="26" fill="#e2e8f0" font-size="10.5">前端 / Client</text>
+
+            <rect x="235" y="15" width="14" height="14" rx="3" fill="rgba(6, 78, 59, 0.8)" stroke="#34d399" stroke-width="1.5" />
+            <text x="255" y="26" fill="#e2e8f0" font-size="10.5">後端 / 應用服務</text>
+
+            <rect x="372" y="15" width="14" height="14" rx="3" fill="rgba(76, 29, 149, 0.8)" stroke="#a78bfa" stroke-width="1.5" />
+            <text x="392" y="26" fill="#e2e8f0" font-size="10.5">資料庫 / ERP</text>
+
+            <rect x="492" y="15" width="14" height="14" rx="3" fill="rgba(120, 53, 15, 0.7)" stroke="#fbbf24" stroke-width="1.5" />
+            <text x="512" y="26" fill="#e2e8f0" font-size="10.5">GCP 儲存 / 分析</text>
+
+            <rect x="630" y="15" width="14" height="14" rx="3" fill="rgba(136, 19, 55, 0.8)" stroke="#fb7185" stroke-width="1.5" />
+            <text x="650" y="26" fill="#e2e8f0" font-size="10.5">安全 / IAM / 驗證</text>
+
+            <rect x="780" y="15" width="14" height="14" rx="3" fill="rgba(154, 52, 18, 0.8)" stroke="#fb923c" stroke-width="1.5" />
+            <text x="800" y="26" fill="#e2e8f0" font-size="10.5">直連 / ML / 未來擴充</text>
+
+            <rect x="942" y="15" width="14" height="14" rx="3" fill="rgba(30, 41, 59, 0.9)" stroke="#cbd5e1" stroke-width="1.5" />
+            <text x="962" y="26" fill="#e2e8f0" font-size="10.5">非雲端獨立元件 (圓角方框)</text>
+
+            <line x1="1138" y1="22" x2="1164" y2="22" stroke="#fb7185" stroke-width="2" stroke-dasharray="4,3" />
+            <text x="1170" y="26" fill="#e2e8f0" font-size="10.5">驗證 / 非同步</text>
+          </g>
+        </svg>
+
+        <!-- HTML Interactive Nodes Layer -->
+        <div class="nodes-layer">
+          <!-- 1. Browser (Independent - Rounded Box) -->
+          <div class="node frontend" id="node-browser" data-flows="all api direct" style="left: 36px; top: 82px; width: 258px; height: 92px;">
+            <div class="node-title">frontend</div>
+            <div class="node-sub">modules/pdm/ · 全域料號秒搜 · Item 360° 五分頁</div>
+            <div class="badge-row">
+              <span class="pill cyan">pdf-lib 動態浮水印</span>
+              <span class="pill">4 工作台</span>
+            </div>
+          </div>
+
+          <!-- 2. MCP Client (Independent - Rounded Box) -->
+          <div class="node frontend" id="node-mcp-client" data-flows="all api erp" style="left: 36px; top: 196px; width: 258px; height: 92px;">
+            <div class="node-title">MCP Client, Skill & AI Agent (VLM)</div>
+            <div class="node-sub">j-pdmplm-import + pdm_client_prep.py</div>
+            <div class="badge-row">
+              <span class="pill cyan">SHA-256 去重</span>
+              <span class="pill">300DPI PNG</span>
+              <span class="pill">PDF 切分</span>
+            </div>
+          </div>
+
+          <!-- 3. Schema Compiler (Independent - Rounded Box) -->
+          <div class="node external" id="node-schema-compiler" data-flows="all erp" style="left: 36px; top: 312px; width: 258px; height: 86px;">
+            <div class="node-title">設計期 ERP Schema 編譯器</div>
+            <div class="node-sub">j-erp-schema-compiler · schema_html_builder.py</div>
+            <div class="badge-row">
+              <span class="pill">9 份 ERP .md → .html 防腐層</span>
+            </div>
+          </div>
+
+          <!-- 4. On-Prem NAS (Independent - Rounded Box) -->
+          <div class="node external" id="node-nas" data-flows="all erp" style="left: 36px; top: 470px; width: 258px; height: 74px;">
+            <div class="node-title">地端 NAS 歷史圖面庫</div>
+            <div class="node-sub">drawings example datastore (16+ 類 CAD/PDF/NC)</div>
+          </div>
+
+          <!-- 5. On-Prem MSSQL ERP (Independent - Rounded Box) -->
+          <div class="node database" id="node-mssql" data-flows="all erp" style="left: 36px; top: 564px; width: 258px; height: 92px;">
+            <div class="node-title">地端 MSSQL ERP [XTABLENAME]</div>
+            <div class="node-sub"> · BOM/DT · BOMWFHD/DT · BOMBLT · ORDER TABLE</div>
+            <div class="badge-row">
+              <span class="pill violet">2-Step 提案與 9 表 Tx</span>
+            </div>
+          </div>
+
+          <!-- 6. Future Trino (Independent - Rounded Box) -->
+          <div class="node ml" id="node-trino" data-flows="all analytics" style="left: 36px; top: 672px; width: 258px; height: 62px;">
+            <div class="node-title">Trino 聯邦查詢引擎</div>
+            <div class="node-sub">ERP + MES + PDM 跨庫聯查 (唯讀 SCRAM)</div>
+          </div>
+
+          <!-- 7. Shared VPC (GCP Icon) -->
+          <div class="node security" id="node-vpc" data-flows="all api erp" style="left: 398px; top: 108px; width: 360px; height: 44px; padding: 6px 12px;">
+            <div class="node-head">
+              <div class="icon-frame" style="width: 30px; height: 30px;">
+                <img src="gcp-svg-icons/Networking/SVG/Networking-512-color-rgb.svg" alt="GCP Networking" onerror="this.style.display='none';this.nextElementSibling.style.display='block';" />
+                <span class="icon-fallback">VPC</span>
+              </div>
+              <div class="node-titles">
+                <div class="node-title">j-shared-vpc-host · Internal Ingress Only</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 8. WireGuard & Nginx Gateway VM (GCP Compute Icon) -->
+          <div class="node cloud" id="node-gateway" data-flows="all api erp" style="left: 398px; top: 164px; width: 360px; height: 86px;">
+            <div class="node-head">
+              <div class="icon-frame">
+                <img src="gcp-svg-icons/Compute/SVG/Compute-512-color.svg" alt="GCP Compute Engine" onerror="this.style.display='none';this.nextElementSibling.style.display='block';" />
+                <span class="icon-fallback">GCE</span>
+              </div>
+              <div class="node-titles">
+                <div class="node-title">vm-wireguard-gateway (e2-micro 免費額度)</div>
+                <div class="node-sub">Nginx 反向代理 ＋ WireGuard VPN 閘道 · 免 Cloud LB 月費</div>
+              </div>
+            </div>
+            <div class="badge-row">
+              <span class="pill amber">Reverse Proxy</span>
+              <span class="pill">WireGuard VPN</span>
+              <span class="pill">ERP / AD / CNC</span>
+            </div>
+          </div>
+
+          <!-- 9. Cloud Run pythonportal (GCP Serverless Icon) -->
+          <div class="node backend" id="node-cloudrun" data-flows="all api direct erp analytics" style="left: 398px; top: 288px; width: 360px; height: 174px;">
+            <div class="node-head">
+              <div class="icon-frame">
+                <img src="gcp-svg-icons/Serverless Computing/SVG/ServerlessComputing-512-color.svg" alt="GCP Cloud Run" onerror="this.style.display='none';this.nextElementSibling.style.display='block';" />
+                <span class="icon-fallback">RUN</span>
+              </div>
+              <div class="node-titles">
+                <div class="node-title">pythonportal Cloud Run (src/pdm/)</div>
+                <div class="node-sub">FastAPI REST + FastMCP (combine_lifespans)</div>
+              </div>
+            </div>
+            <div class="badge-row">
+              <span class="pill emerald">/api/pdm/* (5級 RBAC)</span>
+              <span class="pill rose">/api/pdm/mcp (Bearer)</span>
+              <span class="pill">三層料號檢索</span>
+              <span class="pill">4階歸戶瀑布流</span>
+              <span class="pill">Git-like DAG</span>
+              <span class="pill">三態詢價匹配</span>
+              <span class="pill violet">HTML Parser 防腐層</span>
+            </div>
+          </div>
+
+          <!-- 10. Cross-Project IAM (GCP Security Icon) -->
+          <div class="node security" id="node-iam" data-flows="all api direct analytics" style="left: 398px; top: 494px; width: 360px; height: 68px;">
+            <div class="node-head">
+              <div class="icon-frame">
+                <img src="gcp-svg-icons/Security Identity/SVG/SecurityIdentity-512-color.svg" alt="GCP Security Identity" onerror="this.style.display='none';this.nextElementSibling.style.display='block';" />
+                <span class="icon-fallback">IAM</span>
+              </div>
+              <div class="node-titles">
+                <div class="node-title">跨專案無金鑰 IAM (j-staff-portal-sa)</div>
+                <div class="node-sub">TokenCreator · signBlob 簽發 5–15m V4 Signed URL</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 11. Hybrid WireGuard VPN (GCP Hybrid Icon) -->
+          <div class="node cloud" id="node-vpn" data-flows="all erp" style="left: 382px; top: 588px; width: 392px; height: 60px;">
+            <div class="node-head">
+              <div class="icon-frame" style="width: 34px; height: 34px;">
+                <img src="gcp-svg-icons/Hybrid & Multicloud/SVG/HybridMulticloud-512-color.svg" alt="GCP Hybrid Cloud" onerror="this.style.display='none';this.nextElementSibling.style.display='block';" />
+                <span class="icon-fallback">VPN</span>
+              </div>
+              <div class="node-titles">
+                <div class="node-title">WireGuard 加密混合雲隧道</div>
+                <div class="node-sub">us-west1 Cloud Run ↔ 地端 MSSQL ERP</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 12. Terraform & GitHub Actions (Independent - Rounded Box) -->
+          <div class="node external" id="node-iac" data-flows="all" style="left: 382px; top: 660px; width: 392px; height: 62px;">
+            <div class="node-title">Terraform IaC &amp; GitHub Actions CI/CD</div>
+            <div class="node-sub">infra/terraform/ 獨立專案佈建 · uv + PyInstaller 雙重打包</div>
+          </div>
+
+          <!-- 13. GCS Bucket 3-Zone Hive Lakehouse (GCP Storage Icon) -->
+          <div class="node cloud" id="node-gcs" data-flows="all direct api analytics" style="left: 868px; top: 86px; width: 380px; height: 164px;">
+            <div class="node-head">
+              <div class="icon-frame">
+                <img src="gcp-svg-icons/Storage/SVG/Storage-512-color.svg" alt="GCP Cloud Storage" onerror="this.style.display='none';this.nextElementSibling.style.display='block';" />
+                <span class="icon-fallback">GCS</span>
+              </div>
+              <div class="node-titles">
+                <div class="node-title">Cloud Storage · 三區段 Hive 資料湖</div>
+                <div class="node-sub">asia-east1 · 100% Private · Versioning · CORS 限前端</div>
+              </div>
+            </div>
+            <div class="badge-row">
+              <span class="pill amber">1. raw_vault/ (SHA-256 不可變原檔)</span>
+              <span class="pill emerald">2. curated_items/ (完整 JSON + 切分 PDF/CAD)</span>
+              <span class="pill orange">3. ml_features/ (regions/ + embeddings/ Parquet)</span>
+            </div>
+          </div>
+
+          <!-- 14. Firestore Enterprise (GCP Databases Icon) -->
+          <div class="node database" id="node-firestore" data-flows="all api analytics" style="left: 868px; top: 282px; width: 380px; height: 158px;">
+            <div class="node-head">
+              <div class="icon-frame">
+                <img src="gcp-svg-icons/Databases/SVG/Databases-512-color.svg" alt="GCP Firestore Enterprise" onerror="this.style.display='none';this.nextElementSibling.style.display='block';" />
+                <span class="icon-fallback">DB</span>
+              </div>
+              <div class="node-titles">
+                <div class="node-title">Firestore Enterprise (MongoDB 相容)</div>
+                <div class="node-sub">單筆 &lt; 4 KiB 熱索引 · PyMongo AsyncMongoClient</div>
+              </div>
+            </div>
+            <div class="badge-row">
+              <span class="pill violet">pdm_items</span>
+              <span class="pill violet">pdm_commits</span>
+              <span class="pill violet">pdm_refs</span>
+              <span class="pill violet">pdm_bom_edges</span>
+              <span class="pill">raw_files / segments</span>
+              <span class="pill">ncr / jobs / audit</span>
+              <span class="pill orange">_trino_schema</span>
+            </div>
+          </div>
+
+          <!-- 15. BigQuery (GCP Data Analytics Icon) -->
+          <div class="node cloud" id="node-bigquery" data-flows="all analytics" style="left: 868px; top: 472px; width: 380px; height: 112px;">
+            <div class="node-head">
+              <div class="icon-frame">
+                <img src="gcp-svg-icons/Data Analytics/SVG/DataAnalytics-512-color.svg" alt="GCP BigQuery" onerror="this.style.display='none';this.nextElementSibling.style.display='block';" />
+                <span class="icon-fallback">BQ</span>
+              </div>
+              <div class="node-titles">
+                <div class="node-title">BigQuery (pdm_analytics Dataset)</div>
+                <div class="node-sub">跨客戶 SQL 報價／製程分析與幾何相似件向量檢索</div>
+              </div>
+            </div>
+            <div class="badge-row">
+              <span class="pill amber">External Tables (JSON)</span>
+              <span class="pill orange">VECTOR_SEARCH (Parquet)</span>
+            </div>
+          </div>
+
+          <!-- 16. Phase 2B ML & Watermark (GCP AI/ML Icon) -->
+          <div class="node ml" id="node-ml" data-flows="all analytics" style="left: 868px; top: 618px; width: 380px; height: 112px;">
+            <div class="node-head">
+              <div class="icon-frame">
+                <img src="gcp-svg-icons/AI _ Machine Learning/SVG/AIMachineLearning-512-color.svg" alt="GCP AI Machine Learning" onerror="this.style.display='none';this.nextElementSibling.style.display='block';" />
+                <span class="icon-fallback">ML</span>
+              </div>
+              <div class="node-titles">
+                <div class="node-title">Phase 2B · 工程圖 ML 視覺特徵管線</div>
+                <div class="node-sub">Object Detection (10 種 region_type) → Image Embedding</div>
+              </div>
+            </div>
+            <div class="badge-row">
+              <span class="pill orange">三視圖/剖視圖切圖</span>
+              <span class="pill">選配: asia-east1 Watermark Cloud Run</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Interactive Component Inspector -->
+    <div class="inspector" id="inspector">
+      <div class="inspector-main">
+        <span class="inspector-badge" id="insp-badge">架構總覽</span>
+        <h2 id="insp-title">點擊上方任一元件，檢視詳細技術規格與設計依據</h2>
+        <p id="insp-desc">本架構整合「us-west1 既有應用層與 Shared VPC」、「asia-east1 獨立 PDM/PLM 資料湖專案」及「地端 MSSQL ERP [XTABLENAME]」，透過 V4 Signed URL 達成台灣區零跨洲圖檔直連。</p>
+      </div>
+      <div class="inspector-meta" id="insp-meta">
+        <div><strong>核心原則：</strong>資料與應用跨專案分離、無金鑰 IAM 授權</div>
+        <div><strong>圖檔傳輸：</strong>台灣瀏覽器直連 asia-east1 GCS (零跨洲 Egress)</div>
+        <div><strong>參考文件：</strong>ADR-0001 / ADR-0002 / ADR-0003</div>
+      </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="cards-grid">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-dot cyan"></div>
+          <h3>跨區混合雲與零跨洲流量 (ADR-0001)</h3>
+        </div>
+        <ul>
+          <li>• <strong>流量分離：</strong>KB 級 API 走 us-west1 免費 e2-micro Nginx；MB 級圖檔由台灣瀏覽器透過 V4 Signed URL 直連 asia-east1 GCS。</li>
+          <li>• <strong>動態浮水印：</strong>前端以 <strong>pdf-lib</strong> 即時壓印姓名、時間、版次與狀態並寫入 <code>pdm_audit_events</code>。</li>
+          <li>• <strong>零新增固定月費：</strong>沿用 <code>j-shared-vpc</code> 與 WireGuard VPN 連接地端 ERP。</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-dot violet"></div>
+          <h3>熱冷分層與 Git-like DAG (ADR-0002 / 0003)</h3>
+        </div>
+        <ul>
+          <li>• <strong>Firestore Enterprise：</strong>啟用 MongoDB 相容模式，單筆嚴格 <strong>&lt; 4 KiB</strong>，支撐三層料號檢索與Trino 聯查。</li>
+          <li>• <strong>GCS 三區段湖倉：</strong><code>raw_vault/</code> 不可變原檔、<code>curated_items/</code> 完整 14 項工程 JSON、<code>ml_features/</code> 向量 Parquet。</li>
+          <li>• <strong>單一物料 DAG：</strong>以 <code>main</code>、<code>shop/jk</code>、<code>process/op10-t</code> 分支追蹤血緣並自動偵測過期衍生圖。</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-dot amber"></div>
+          <h3>ERP 防腐層與雙階段寫入 (MCP Spec)</h3>
+        </div>
+        <ul>
+          <li>• <strong>HTML Schema 防腐層：</strong>設計期編譯 9 份 <code>.md</code> 為 <code>.html</code>，執行期 Python HTML Parser 100% 決定論驗證與填預設值。</li>
+          <li>• <strong>Step a 料號提案：</strong>自動檢查 <code></code> 撞號，無圖號或撞號時推算 <code>{客戶代號}-{MAX(N)+1}</code> 並等待人工確認。</li>
+          <li>• <strong>Step b/c 交易寫入：</strong>單一 MSSQL Transaction 寫入 9 張表，成功後回寫 <code>erp_item_code</code> 雙向綁定。</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <span>j Precision Machinery · PDM/PLM Cloud Architecture (Phase 2A / 2B)</span>
+      <span>Icons: architecture_icons/gcp-svg-icons (relative path) · Independent services rendered as rounded boxes</span>
+    </div>
+  </div>
+
+  <script>
+    const NODE_DETAILS = {
+      'node-browser': {
+        badge: '獨立元件 · Frontend',
+        title: '台灣員工瀏覽器 — staffportal-frontend (modules/pdm/)',
+        desc: '整合於既有員工入口網站前端，提供全域料號秒搜、物料與圖面總覽、接單審查工作台、ERP 拋轉佇列、品保 NCR 閉環及 Item 360° 五分頁詳情頁。',
+        meta: [
+          ['技術棧', 'Vanilla JS 模組 · pdf-lib (瀏覽器端動態浮水印)'],
+          ['流量路徑', 'KB 級 API → us-west1；MB 級圖檔 → 直連 asia-east1 GCS'],
+          ['設計依據', 'PDM_PLM_APP_AND_INFRA_SPEC.md §6 · ADR-0001']
+        ]
+      },
+      'node-mcp-client': {
+        badge: '獨立元件 · MCP Client',
+        title: 'MCP Client & AI Agent (j-pdmplm-import)',
+        desc: '在本地端或 NAS 掛載環境執行高 I/O 決定論檔案預處理（pdm_client_prep.py），搭配 AI VLM 執行路徑語意 NER 與 14 項衍生應用深度圖面判讀。',
+        meta: [
+          ['雙重打包', 'uv (PEP 723 Inline Metadata) + PyInstaller 單一執行檔'],
+          ['核心腳本', 'scan-workspace · inspect-pdf (300DPI) · split-pdf · stage-local-hive'],
+          ['設計依據', 'PDM_PLM_MCP_SYSTEM_SPEC.md §4.5 · APP Spec §8']
+        ]
+      },
+      'node-schema-compiler': {
+        badge: '獨立元件 · Design-Time',
+        title: '設計期 ERP Schema 編譯器 (j-erp-schema-compiler)',
+        desc: '將人類維護的 MSSQL [XTABLENAME] 9 份資料表 Markdown Schema 編譯為帶 semantic-key、default-val、enum-map 與 computed-rule 的結構化 HTML。',
+        meta: [
+          ['核心腳本', 'schema_html_builder.py (parse-md / render-html / validate-html)'],
+          ['防腐效益', '修改 ERP 欄位預設值只需改 .html，免改 Python 程式碼'],
+          ['設計依據', 'PDM_PLM_MCP_SYSTEM_SPEC.md §4.1 & §4.5']
+        ]
+      },
+      'node-nas': {
+        badge: '獨立元件 · On-Premises',
+        title: '地端 NAS 歷史圖面庫',
+        desc: '存放 RFM瑞豐機械庫、tornos庫 等 16 類以上歷史 CAD/PDF/NC 檔案與商務單據，經 SHA-256 去重與混裝 PDF 切分後匯入雲端湖倉。',
+        meta: [
+          ['支援格式', '.pdf, .dwg, .dxf, .step, .sldprt, .sldasm, .nc, .mcam 等 16+ 類'],
+          ['溯源機制', '保留 FilePathOccurrence 與頁碼 Provenance'],
+          ['設計依據', 'PDM_PLM_MCP_SYSTEM_SPEC.md §1 & §3.1']
+        ]
+      },
+      'node-mssql': {
+        badge: '獨立元件 · On-Premises ERP',
+        title: '地端 MSSQL ERP [XTABLENAME]',
+        desc: '企業正式 ERP 資料庫，經 WireGuard VPN 執行兩階段料號提案與單一 Transaction 寫入，並將正式 SK_NO 雙向回寫 PDM。',
+        meta: [
+          ['寫入 9 張表', ', BOM, BOMDT, BOMWFHD, BOMWFHDDT, BOMBLT, BOMBLTDT, ORDER TABLE, ORDER DETAIL TABLE'],
+          ['料號規則', '無撞號用客供號；無圖號/撞號採 {客戶代號}-{MAX(N)+1}，原號入 SK_FIRSKNO'],
+          ['設計依據', 'PDM_PLM_MCP_SYSTEM_SPEC.md §4.4']
+        ]
+      },
+      'node-trino': {
+        badge: '獨立元件 · Future Federated Query',
+        title: 'Trino 聯邦查詢引擎',
+        desc: '透過專屬唯讀 SCRAM 帳號連接 Firestore Enterprise（MongoDB Connector）與 BigQuery/GCS，實現 MSSQL ERP、MES 與 PDM 跨庫聯合分析。',
+        meta: [
+          ['連接器', 'Trino MongoDB Connector (_trino_schema) + BigQuery/Hive Connector'],
+          ['安全隔離', '與 Cloud Run IAM 驗證分離，使用獨立唯讀 SCRAM 帳號'],
+          ['設計依據', 'ADR-0002 · PDM_PLM_APP_AND_INFRA_SPEC.md §3.1']
+        ]
+      },
+      'node-vpc': {
+        badge: 'GCP Networking',
+        title: 'j-shared-vpc-host (INGRESS_TRAFFIC_INTERNAL_ONLY)',
+        desc: '既有共享 VPC 安全邊界，強制 pythonportal Cloud Run 僅接受來自內部 VPC 閘道的流量，不直接暴露公網端點。',
+        meta: [
+          ['圖示路徑', 'gcp-svg-icons/Networking/SVG/Networking-512-color-rgb.svg'],
+          ['網路安全', 'INGRESS_TRAFFIC_INTERNAL_ONLY'],
+          ['設計依據', 'ADR-0001']
+        ]
+      },
+      'node-gateway': {
+        badge: 'GCP Compute Engine',
+        title: 'vm-wireguard-gateway (e2-micro 免費額度)',
+        desc: '部署於 us-west1 的極低成本閘道 VM，同時擔任對外 Nginx 反向代理與對地端廠區的 WireGuard VPN 閘道，免除 Cloud Load Balancer 月費。',
+        meta: [
+          ['圖示路徑', 'gcp-svg-icons/Compute/SVG/Compute-512-color.svg'],
+          ['功能角色', 'Nginx Reverse Proxy + WireGuard VPN (ERP / AD / CNC)'],
+          ['設計依據', 'ADR-0001']
+        ]
+      },
+      'node-cloudrun': {
+        badge: 'GCP Cloud Run · us-west1',
+        title: 'pythonportal Cloud Run (src/pdm/)',
+        desc: '整合 FastAPI REST API（/api/pdm/*）與 FastMCP（/api/pdm/mcp），共用 Domain Services 處理三層檢索、4 階歸戶、Git-like DAG、三態匹配與 ERP 轉譯。',
+        meta: [
+          ['圖示路徑', 'gcp-svg-icons/Serverless Computing/SVG/ServerlessComputing-512-color.svg'],
+          ['認證權限', 'REST: Cookie + 5 級 RBAC；MCP: Bearer AuthMiddleware'],
+          ['核心模組', 'router.py · mcp_server.py · service.py · item_resolver_and_hive.py · erp_translator.py']
+        ]
+      },
+      'node-iam': {
+        badge: 'GCP Security & Identity',
+        title: '跨專案無金鑰 IAM (j-staff-portal-sa)',
+        desc: '透過跨專案最小權限授權存取 asia-east1 資料層，並使用自身 roles/iam.serviceAccountTokenCreator 權限呼叫 signBlob 簽發短期 V4 Signed URL。',
+        meta: [
+          ['圖示路徑', 'gcp-svg-icons/Security Identity/SVG/SecurityIdentity-512-color.svg'],
+          ['最小權限', 'roles/datastore.user · roles/storage.objectAdmin · roles/bigquery.dataViewer'],
+          ['設計依據', 'PDM_PLM_APP_AND_INFRA_SPEC.md §7 · ADR-0001']
+        ]
+      },
+      'node-vpn': {
+        badge: 'GCP Hybrid & Multicloud',
+        title: 'WireGuard 加密混合雲隧道',
+        desc: '安全連接 us-west1 應用層與地端廠區網路，提供 MSSQL ERP 雙向讀寫與後續 MES/CNC 整合通道。',
+        meta: [
+          ['圖示路徑', 'gcp-svg-icons/Hybrid & Multicloud/SVG/HybridMulticloud-512-color.svg'],
+          ['加密傳輸', 'WireGuard L3 VPN Tunnel'],
+          ['設計依據', 'ADR-0001']
+        ]
+      },
+      'node-iac': {
+        badge: '獨立元件 · IaC & CI/CD',
+        title: 'Terraform IaC & GitHub Actions',
+        desc: '以 Terraform 宣告式管理獨立 PDM GCP 專案（GCS、Firestore Enterprise + MongoDB 索引、BigQuery、跨專案 IAM），並透過 GitHub Actions 建置跨平台 CLI 執行檔。',
+        meta: [
+          ['基礎設施', 'j-pdmplm/infra/terraform/'],
+          ['發佈產物', 'pdm-prep-windows-x64.exe & pdm-prep-linux-x64 (GitHub Releases)'], ['設計依據', 'PDM_PLM_APP_AND_INFRA_SPEC.md §7 & §8']
+        ]
+      },
+      'node-gcs': {
+        badge: 'GCP Cloud Storage · asia-east1',
+        title: 'GCS 三區段 Hive Partition 資料湖',
+        desc: '位於台灣區 100% Private Bucket，啟用 Uniform Bucket-Level Access、Object Versioning 與嚴格前端 CORS，供瀏覽器 V4 Signed URL 零跨洲直連。',
+        meta: [
+          ['圖示路徑', 'gcp-svg-icons/Storage/SVG/Storage-512-color.svg'],
+          ['三區段架構', 'raw_vault/ · curated_items/ (14項JSON+PDF/CAD) · ml_features/ (regions+embeddings)'],
+          ['設計依據', 'PDM_PLM_APP_AND_INFRA_SPEC.md §2 · ADR-0002']
+        ]
+      },
+      'node-firestore': {
+        badge: 'GCP Databases · asia-east1',
+        title: 'Firestore Enterprise (MongoDB Compatible API)',
+        desc: '輕量化熱索引層（每筆嚴格 < 4 KiB），以 PyMongo AsyncMongoClient 連線，支撐毫秒級三層料號檢索、Git-like DAG 版本圖與 BOM/Where-Used 查詢。',
+        meta: [
+          ['圖示路徑', 'gcp-svg-icons/Databases/SVG/Databases-512-color.svg'],
+          ['核心集合', 'pdm_items · pdm_commits · pdm_refs · pdm_bom_edges · raw_files · segments · ncr · jobs · audit'],
+          ['設計依據', 'PDM_PLM_APP_AND_INFRA_SPEC.md §3 · ADR-0002 & 0003']
+        ]
+      },
+      'node-bigquery': {
+        badge: 'GCP Data Analytics · asia-east1',
+        title: 'BigQuery (pdm_analytics Dataset)',
+        desc: '以 External Tables 直接掛載 GCS curated_items/ JSON 與 ml_features/embeddings/ Parquet，支撐跨客戶 SQL 報價分析與 VECTOR_SEARCH 相似件檢索。',
+        meta: [
+          ['圖示路徑', 'gcp-svg-icons/Data Analytics/SVG/DataAnalytics-512-color.svg'],
+          ['核心能力', 'External Tables + VECTOR_SEARCH (無需搬移資料)'],
+          ['設計依據', 'PDM_PLM_APP_AND_INFRA_SPEC.md §7 · ADR-0002']
+        ]
+      },
+      'node-ml': {
+        badge: 'GCP AI / Machine Learning · Phase 2B',
+        title: 'Phase 2B · 工程圖 ML 視覺特徵與浮水印擴充',
+        desc: '預留工程圖 Object Detection 切出 10 種語意區域（三視圖、剖視圖、局部放大圖等）並建立 Image Embedding；若需防竄改強制浮水印，於 asia-east1 增設 Scale-to-zero Cloud Run。',
+        meta: [
+          ['圖示路徑', 'gcp-svg-icons/AI _ Machine Learning/SVG/AIMachineLearning-512-color.svg'],
+          ['區域類型', 'ISOMETRIC_VIEW · SECTION_VIEW · DETAIL_VIEW · TITLE_BLOCK 等 10 類'],
+          ['設計依據', 'PDM_PLM_APP_AND_INFRA_SPEC.md §2.1 & §9']
+        ]
+      }
+    };
+
+    // Interactive Flow Filtering
+    const filterButtons = document.querySelectorAll('.filter-btn');
+    const nodes = document.querySelectorAll('.node');
+    const edges = document.querySelectorAll('.edge-group');
+
+    filterButtons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        filterButtons.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const flow = btn.dataset.flow;
+
+        nodes.forEach(n => {
+          const flows = (n.dataset.flows || '').split(' ');
+          n.classList.toggle('dimmed', flow !== 'all' && !flows.includes(flow));
+        });
+
+        edges.forEach(e => {
+          const flows = (e.dataset.flows || '').split(' ');
+          e.classList.toggle('dimmed', flow !== 'all' && !flows.includes(flow));
+        });
+      });
+    });
+
+    // Interactive Node Inspector
+    const inspBadge = document.getElementById('insp-badge');
+    const inspTitle = document.getElementById('insp-title');
+    const inspDesc = document.getElementById('insp-desc');
+    const inspMeta = document.getElementById('insp-meta');
+
+    nodes.forEach(node => {
+      node.addEventListener('click', () => {
+        nodes.forEach(n => n.classList.remove('selected'));
+        node.classList.add('selected');
+        const info = NODE_DETAILS[node.id];
+        if (!info) return;
+        inspBadge.textContent = info.badge;
+        inspTitle.textContent = info.title;
+        inspDesc.textContent = info.desc;
+        inspMeta.innerHTML = info.meta.map(([k, v]) => `<div><strong>${k}：</strong>${v}</div>`).join('');
+      });
+    });
+
+    // Export Toolbar Functions (architecture-diagram skill standard)
+    function toggleToolbar() {
+      document.getElementById('export-toolbar').classList.toggle('open');
+    }
+
+    async function captureDiagram() {
+      const container = document.getElementById('report-container');
+      const rect = container.getBoundingClientRect();
+      const pad = 32;
+      return html2canvas(document.body, {
+        backgroundColor: '#020617',
+        scale: 2,
+        useCORS: true,
+        x: Math.max(0, rect.left + window.scrollX - pad),
+        y: Math.max(0, rect.top + window.scrollY - pad),
+        width: rect.width + pad * 2,
+        height: rect.height + pad * 2,
+        ignoreElements: el => el.classList && (el.classList.contains('toolbar') || el.classList.contains('controls-bar'))
+      });
+    }
+
+    async function copyAsImage() {
+      try {
+        const canvas = await captureDiagram();
+        canvas.toBlob(async blob => {
+          await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+          alert('已將高解析度架構圖複製到剪貼簿！');
+        });
+      } catch (err) {
+        alert('無法寫入剪貼簿（需 HTTPS 或 localhost 環境），請改用 PNG 下載。');
+      }
+    }
+
+    async function downloadPNG() {
+      const canvas = await captureDiagram();
+      const link = document.createElement('a');
+      link.download = 'j-pdmplm-architecture.png';
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    }
+
+    async function downloadPDF() {
+      const canvas = await captureDiagram();
+      const imgData = canvas.toDataURL('image/png');
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF({
+        orientation: canvas.width > canvas.height ? 'landscape' : 'portrait',
+        unit: 'px',
+        format: [canvas.width / 2, canvas.height / 2]
+      });
+      pdf.addImage(imgData, 'PNG', 0, 0, canvas.width / 2, canvas.height / 2);
+      pdf.save('j-pdmplm-architecture.pdf');
+    }
+  </script>
+</body>
+</html>

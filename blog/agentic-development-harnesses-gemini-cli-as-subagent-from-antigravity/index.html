@@ -1,0 +1,85 @@
+<!DOCTYPE html><html lang="zh-Hant"> <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Agentic-Development Harnesses - Gemini-cli As Subagent (From Antigravity) | TJ Jiang</title><meta name="description" content="Make Gemini-cli act as a subagent to accept delegated tasks"><script>
+      // 進頁面立即套主題，避免閃爍：localStorage 優先，其次系統偏好
+      const saved = localStorage.getItem('theme');
+      document.documentElement.dataset.theme =
+        saved ?? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    </script><style>:root{--color-bg: #ffffff;--color-text: #1a202c;--color-muted: #64748b;--color-accent: #2563eb;--color-surface: #f1f5f9;--color-border: #e2e8f0;--font-body: system-ui, "Noto Sans TC", "PingFang TC", sans-serif;--font-mono: ui-monospace, "Cascadia Code", "Courier New", monospace;--radius: 8px;--content-width: 46rem}:root[data-theme=dark]{--color-bg: #0f172a;--color-text: #e2e8f0;--color-muted: #94a3b8;--color-accent: #60a5fa;--color-surface: #1e293b;--color-border: #334155}*{box-sizing:border-box}body{margin:0;background:var(--color-bg);color:var(--color-text);font-family:var(--font-body);line-height:1.7}a{color:var(--color-accent);text-decoration:none}a:hover{text-decoration:underline}main{max-width:var(--content-width);margin:0 auto;padding:2rem 1rem 4rem}code,pre{font-family:var(--font-mono)}pre{background:var(--color-surface);border:1px solid var(--color-border);border-radius:var(--radius);padding:1rem;overflow-x:auto}img{max-width:100%;height:auto}time{color:var(--color-muted);font-size:.875rem}.site-header{display:flex;align-items:center;gap:1.5rem;flex-wrap:wrap;padding:.75rem 1rem;border-bottom:1px solid var(--color-border)}.site-header .site-title{font-weight:700;color:var(--color-text)}.site-header nav{display:flex;gap:1rem;flex:1}.site-header nav a[aria-current=page]{font-weight:700}.site-footer{display:flex;gap:1rem;justify-content:space-between;flex-wrap:wrap;padding:1rem;border-top:1px solid var(--color-border);color:var(--color-muted)}.site-footer ul{display:flex;gap:1rem;list-style:none;margin:0;padding:0}#theme-toggle{background:var(--color-surface);color:var(--color-text);border:1px solid var(--color-border);border-radius:var(--radius);padding:.25rem .6rem;cursor:pointer}.tags{display:flex;gap:.5rem;list-style:none;margin:.5rem 0;padding:0;flex-wrap:wrap}.post-list{list-style:none;padding:0}.post-list li{padding:.75rem 0;border-bottom:1px solid var(--color-border)}.post-list p{margin:.25rem 0 0;color:var(--color-muted)}.pagination{display:flex;gap:1rem;justify-content:center;margin-top:2rem}.docs-grid{display:grid;grid-template-columns:14rem 1fr;gap:2rem}.docs-sidebar ul{list-style:none;padding:0}@media(max-width:48rem){.docs-grid{grid-template-columns:1fr}}main.wide{max-width:72rem}
+</style></head> <body> <header class="site-header"> <a class="site-title" href="/">TJ Jiang</a> <nav> <a href="/">首頁</a><a href="/blog/">部落格</a><a href="/portfolio/">作品集</a><a href="/docs/">文件</a> </nav> <button id="theme-toggle" aria-label="切換亮暗模式">◐</button> <script>
+  document.getElementById('theme-toggle').addEventListener('click', () => {
+    const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+    document.documentElement.dataset.theme = next;
+    localStorage.setItem('theme', next);
+  });
+</script> </header> <main> <article> <header> <h1>Agentic-Development Harnesses - Gemini-cli As Subagent (From Antigravity)</h1> <time datetime="2026-10-19T00:00:00.000Z">2026-10-19</time> <ul class="tags"> <li><a href="/blog/tags/coding agent/">#coding agent</a></li><li><a href="/blog/tags/agentic development/">#agentic development</a></li><li><a href="/blog/tags/subagent/">#subagent</a></li><li><a href="/blog/tags/gemini-cli/">#gemini-cli</a></li> </ul> </header> <h1 id="background">Background</h1>
+<p>Our company subscribed Gemini Enterprise to have access to AI coding agents, and there are both usage quotas in Antigravity and Gemini Code Assist (Google is deprecating Gemini Code Assist, replacing them with Antigravity).
+The quotas are separate, and available models are also different. Antigravity provides access to <code>Gemini 4 Argon</code>, while Gemini-cli only provides access to gemini flash models (including <code>gemini-3.8-flash</code>).
+To make best use of both, I make gemini-cli act as a subagent.</p>
+<h1 id="steps">Steps</h1>
+<p>Create an subagent (definition) in your coding agent. For example, in Antigravity <code>/agents</code> may guide you where the subagent definition files should be stored:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>Create New Agents</span></span>
+<span class="line"><span>  Workspace: /mnt/d/scripts/.agents/agents/{agent_name}/agent.md</span></span>
+<span class="line"><span>  Global: /root/.gemini/config/agents/{agent_name}/agent.md</span></span></code></pre>
+<p>The definition may be as follows:</p>
+<pre class="astro-code github-dark" style="background-color:#24292e;color:#e1e4e8; overflow-x: auto;" tabindex="0" data-language="plaintext"><code><span class="line"><span>---</span></span>
+<span class="line"><span>name: gemini-cli-flash-3.8</span></span>
+<span class="line"><span>description: A subagent that uses Gemini-cli as subagent, which equipped gemini-cli-flash-3.8 model.</span></span>
+<span class="line"><span>tools:</span></span>
+<span class="line"><span>    - send_message</span></span>
+<span class="line"><span>    - view_file</span></span>
+<span class="line"><span>    - read_url_content</span></span>
+<span class="line"><span>    - search_web</span></span>
+<span class="line"><span>    - schedule</span></span>
+<span class="line"><span>    - generate_image</span></span>
+<span class="line"><span>    - multi_replace_file_content</span></span>
+<span class="line"><span>    - replace_file_content</span></span>
+<span class="line"><span>    - write_to_file</span></span>
+<span class="line"><span>    - run_command</span></span>
+<span class="line"><span>    - manage_task</span></span>
+<span class="line"><span>    - notebook_edit</span></span>
+<span class="line"><span>---</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span># Agent System Instructions</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>## Background</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>Gemini-cli is an program that has the ability to act as an agent, especially an coding agent.</span></span>
+<span class="line"><span>An example script to initiate it with necessary environment settings is shown as below:</span></span>
+<span class="line"><span>``bash</span></span>
+<span class="line"><span>#!/bin/bash</span></span>
+<span class="line"><span>export GOOGLE_CLOUD_PROJECT_ID=[ID]</span></span>
+<span class="line"><span>export GOOGLE_CLOUD_PROJECT=[ID]</span></span>
+<span class="line"><span>gemini -m gemini-3.8-flash "&#x3C;prompt>" -i --approval-mode=default --output-format text</span></span>
+<span class="line"><span>``</span></span>
+<span class="line"><span>where "&#x3C;prompt>" is the input of the program, which is also what will be delegated to the subagent.</span></span>
+<span class="line"><span>After initialization, interaction with it depends on further inputs and interactive slash commands (see below).</span></span>
+<span class="line"><span>If gemini-cli proposes confirmation prompts or asks for approval for executing some commands, forward any tool execution confirmation prompt back here so that I can decide.</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>## Core CLI Flags &#x26; Options</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>Flag	Short Form	Description</span></span>
+<span class="line"><span>--model &#x3C;name>	-m	Specify the Gemini model to use (e.g., aliases like auto, pro, flash, flash-lite).</span></span>
+<span class="line"><span>--prompt &#x3C;text>	-p	Run in non-interactive (headless) mode with the provided prompt and exit.</span></span>
+<span class="line"><span>--prompt-interactive &#x3C;text>	-i	Start an interactive session with initial prompt input.</span></span>
+<span class="line"><span>--resume &#x3C;session>	-r	Resume a previous session (use latest, an index number, or session UUID).</span></span>
+<span class="line"><span>--sandbox	-s	Enable tool execution sandboxing for safety.</span></span>
+<span class="line"><span>--approval-mode=&#x3C;mode>	—	Set tool approval behavior (default, auto_edit, or plan).</span></span>
+<span class="line"><span>--output-format=&#x3C;format>	-o	Specify output formatting (text or json).</span></span>
+<span class="line"><span>--debug	-d	Enable verbose debug output.</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>Other available cli flags are at [cli-references](https://geminicli.com/docs/cli/cli-reference/).</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>## Interactive Slash Commands (/)</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>Inside the interactive REPL (gemini), you can use built-in slash commands:</span></span>
+<span class="line"><span>• Session &#x26; Chat: /chat (or /resume), /clear (reset session and screen), /compress (summarize context), /quit (or /exit).</span></span>
+<span class="line"><span>• Configuration &#x26; Models: /model (change model), /settings (open settings editor), /theme (change visual theme), /vim (toggle Vim mode).</span></span>
+<span class="line"><span>• Tools &#x26; Extensions: /mcp (manage MCP servers), /extensions (manage extensions), /tools (list available tools), /skills (manage agent skills).</span></span>
+<span class="line"><span>• System &#x26; Info: /help (display help menu), /stats (view token usage and quota stats), /init (generate GEMINI.md).</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>At Commands (@) &#x26; Shell Passthrough (!)</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>• File/Directory Injection: @&#x3C;path> injects file or directory contents with git-aware filtering into your prompt context.</span></span>
+<span class="line"><span>• Shell Execution: !&#x3C;shell_command> runs a shell command in your system's default shell and returns the output to Gemini CLI.</span></span>
+<span class="line"><span>• Shell Mode: Typing ! on its own toggles full interactive shell mode.</span></span>
+<span class="line"><span></span></span>
+<span class="line"><span>Other available commands are at [command references](https://geminicli.com/docs/reference/commands/):</span></span></code></pre> </article> </main> <footer class="site-footer"> <p>© 2026 TJ Jiang</p> <ul> <li><a href="https://github.com/tingjhenjiang">GitHub</a></li> </ul> <p>powered by <a href="https://astro.build/">Astro</a> and <a href="https://quarto.org/">Quarto</a></p> </footer> </body></html>

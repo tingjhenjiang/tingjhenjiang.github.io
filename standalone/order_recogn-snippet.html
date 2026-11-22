@@ -1,0 +1,1087 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>order_recog — 訂單辨識系統架構圖 (Jocko Precision)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js" integrity="sha384-ZZ1pncU3bQe8y31yfZdMFdSpttDoPmOZg2wguVK9almUodir1PghgT0eY7Mrty8H" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js" integrity="sha384-en/ztfPSRkGfME4KIm05joYXynqzUgbsG5nMrj/xEFAHXkeZfO3yMK8QQ+mP7p1/" crossorigin="anonymous"></script>
+  <style>
+    :root {
+      --bg-page: #020617;
+      --bg-card: #0b1224;
+      --bg-node: #0f172a;
+      --border-subtle: #1e293b;
+      --text-primary: #f8fafc;
+      --text-secondary: #cbd5e1;
+      --text-muted: #94a3b8;
+      --cyan: #22d3ee;
+      --emerald: #34d399;
+      --violet: #a78bfa;
+      --amber: #fbbf24;
+      --rose: #fb7185;
+      --orange: #fb923c;
+      --slate: #e2e8f0;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg-page);
+      color: var(--text-primary);
+      font-family: 'JetBrains Mono', 'Noto Sans TC', monospace, sans-serif;
+      min-height: 100vh;
+      padding: 28px 20px 40px;
+      line-height: 1.5;
+    }
+
+    .container {
+      max-width: 1360px;
+      margin: 0 auto;
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+      margin-bottom: 18px;
+      flex-wrap: wrap;
+    }
+
+    .title-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .title-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .pulse-dot {
+      width: 11px;
+      height: 11px;
+      border-radius: 50%;
+      background: var(--emerald);
+      box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.7);
+      animation: pulse 2s infinite;
+      flex-shrink: 0;
+    }
+
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.75); }
+      70% { box-shadow: 0 0 0 10px rgba(52, 211, 153, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0); }
+    }
+
+    h1 {
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      color: #ffffff;
+    }
+
+    .subtitle {
+      font-size: 12px;
+      color: var(--text-secondary);
+      padding-left: 23px;
+    }
+
+    /* Export Toolbar */
+    .toolbar {
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .toolbar-actions {
+      display: none;
+      align-items: center;
+      gap: 6px;
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 4px 6px;
+    }
+
+    .toolbar.open .toolbar-actions {
+      display: flex;
+    }
+
+    .toolbar-btn, .toolbar-toggle {
+      background: #0f172a;
+      color: #f8fafc;
+      border: 1px solid #334155;
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+    }
+
+    .toolbar-btn:hover, .toolbar-toggle:hover {
+      background: #1e293b;
+      border-color: var(--cyan);
+    }
+
+    .toolbar-toggle {
+      font-size: 16px;
+      padding: 4px 10px;
+      line-height: 1.2;
+    }
+
+    /* Filter Bar */
+    .filter-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .filter-label {
+      font-size: 11px;
+      color: var(--text-secondary);
+      margin-right: 4px;
+      font-weight: 600;
+    }
+
+    .filter-btn {
+      background: #0f172a;
+      color: #e2e8f0;
+      border: 1px solid #334155;
+      border-radius: 999px;
+      padding: 5px 12px;
+      font-family: inherit;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .filter-btn:hover {
+      border-color: var(--cyan);
+      color: #ffffff;
+    }
+
+    .filter-btn.active {
+      background: rgba(34, 211, 238, 0.18);
+      border-color: var(--cyan);
+      color: #ffffff;
+      box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.35);
+    }
+
+    /* Diagram Card */
+    .diagram-card {
+      background: #020617;
+      border: 1.5px solid #334155;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55);
+      position: relative;
+    }
+
+    .diagram-svg {
+      width: 100%;
+      height: auto;
+      display: block;
+      user-select: none;
+    }
+
+    /* Interactive Node & Flow States */
+    .arch-node {
+      cursor: pointer;
+      transition: opacity 0.2s ease, filter 0.2s ease;
+    }
+
+    .arch-node:hover {
+      filter: brightness(1.18) drop-shadow(0 0 8px rgba(34, 211, 238, 0.45));
+    }
+
+    .arch-node.selected {
+      filter: brightness(1.22) drop-shadow(0 0 10px rgba(251, 191, 36, 0.7));
+    }
+
+    .arch-node.dimmed {
+      opacity: 0.22;
+    }
+
+    .flow-edge {
+      transition: opacity 0.2s ease, stroke-width 0.2s ease;
+    }
+
+    .flow-edge.dimmed {
+      opacity: 0.12;
+    }
+
+    .flow-edge.highlighted {
+      opacity: 1;
+    }
+
+    .icon-badge {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(248, 250, 252, 0.94);
+      border-radius: 7px;
+      padding: 4px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+    }
+
+    .icon-badge img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+    }
+
+    /* Inspector Panel */
+    .inspector {
+      margin-top: 14px;
+      background: var(--bg-card);
+      border: 1.5px solid #334155;
+      border-left: 4px solid var(--cyan);
+      border-radius: 10px;
+      padding: 14px 18px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .inspector-main {
+      flex: 1 1 560px;
+    }
+
+    .inspector-tag {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      padding: 2px 8px;
+      border-radius: 4px;
+      background: rgba(34, 211, 238, 0.15);
+      color: var(--cyan);
+      border: 1px solid rgba(34, 211, 238, 0.4);
+      margin-bottom: 6px;
+    }
+
+    .inspector h2 {
+      font-size: 15px;
+      color: #ffffff;
+      margin-bottom: 6px;
+    }
+
+    .inspector p {
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-bottom: 8px;
+    }
+
+    .inspector-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .meta-pill {
+      font-size: 11px;
+      background: #0f172a;
+      color: #f1f5f9;
+      border: 1px solid #475569;
+      border-radius: 6px;
+      padding: 3px 9px;
+    }
+
+    /* Summary Cards */
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+      margin-top: 18px;
+    }
+
+    @media (max-width: 960px) {
+      .cards-grid { grid-template-columns: 1fr; }
+    }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid #334155;
+      border-radius: 10px;
+      padding: 16px 18px;
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .card-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .card-dot.emerald { background: var(--emerald); }
+    .card-dot.rose { background: var(--rose); }
+    .card-dot.violet { background: var(--violet); }
+
+    .card h3 {
+      font-size: 13px;
+      font-weight: 700;
+      color: #ffffff;
+    }
+
+    .card ul {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 11.5px;
+      color: var(--text-secondary);
+    }
+
+    .card li strong {
+      color: #ffffff;
+    }
+
+    /* Footer */
+    .footer {
+      margin-top: 18px;
+      padding-top: 12px;
+      border-top: 1px solid #1e293b;
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px;
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    @media print {
+      .toolbar, .filter-bar { display: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <div id="report-container" class="container">
+    <!-- Header -->
+    <div class="header">
+      <div class="title-group">
+        <div class="title-row">
+          <span class="pulse-dot"></span>
+          <h1>order_recog — 訂單自動辨識與XY ERP 整合架構圖</h1>
+        </div>
+        <div class="subtitle">
+          Repo: /order_recog (master) · GCP Project: j-XYerp-enhancement · On-Premise MSSQL: XTABLENAME.dbo
+        </div>
+      </div>
+
+      <div class="toolbar" id="export-toolbar">
+        <div class="toolbar-actions">
+          <button class="toolbar-btn" onclick="copyAsImage()" title="複製高解析度 PNG 至剪貼簿">📋 Copy</button>
+          <button class="toolbar-btn" onclick="downloadPNG()" title="下載 PNG 圖片">🖼️ PNG</button>
+          <button class="toolbar-btn" onclick="downloadPDF()" title="匯出單頁深色 PDF">📄 PDF</button>
+        </div>
+        <button class="toolbar-toggle" onclick="toggleToolbar()" aria-label="匯出選單">⋯</button>
+      </div>
+    </div>
+
+    <!-- Interactive Flow Filter -->
+    <div class="filter-bar">
+      <span class="filter-label">流程篩選：</span>
+      <button class="filter-btn active" data-flow="all">全部顯示 (All)</button>
+      <button class="filter-btn" data-flow="web">人工上傳辨識 (Web SPA)</button>
+      <button class="filter-btn" data-flow="batch">Gmail 自動排程寫單 (Batch Task)</button>
+      <button class="filter-btn" data-flow="security">安全憑證與金鑰流 (Auth &amp; Secrets)</button>
+      <button class="filter-btn" data-flow="cicd">CI/CD 建置部署 (Build &amp; Deploy)</button>
+    </div>
+
+    <!-- Main SVG Diagram -->
+    <div class="diagram-card">
+      <svg id="arch-svg" class="diagram-svg" viewBox="0 0 1280 860" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <!-- Subtle Background Grid -->
+          <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+            <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" stroke-width="0.6" />
+          </pattern>
+
+          <!-- High-Contrast Arrowheads -->
+          <marker id="arrow-cyan" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#22d3ee" />
+          </marker>
+          <marker id="arrow-emerald" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#34d399" />
+          </marker>
+          <marker id="arrow-orange" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#fb923c" />
+          </marker>
+          <marker id="arrow-violet" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#a78bfa" />
+          </marker>
+          <marker id="arrow-rose" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#fb7185" />
+          </marker>
+          <marker id="arrow-amber" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#fbbf24" />
+          </marker>
+        </defs>
+
+        <!-- Canvas Background -->
+        <rect width="1280" height="860" fill="#020617" />
+        <rect width="1280" height="860" fill="url(#grid)" />
+
+        <!-- ==================== BOUNDARY BOXES ==================== -->
+        <!-- GCP Project Boundary -->
+        <rect x="272" y="24" width="714" height="700" rx="12" fill="rgba(120, 53, 15, 0.08)" stroke="#fbbf24" stroke-width="1.8" stroke-dasharray="8,4" />
+        <rect x="288" y="13" width="372" height="22" rx="4" fill="#020617" stroke="#fbbf24" stroke-width="1" />
+        <text x="474" y="28" fill="#fde68a" font-size="11" font-weight="700" text-anchor="middle">GCP PROJECT · j-XYerp-enhancement</text>
+
+        <!-- On-Premise Boundary -->
+        <rect x="1016" y="130" width="244" height="440" rx="12" fill="rgba(30, 41, 59, 0.25)" stroke="#cbd5e1" stroke-width="1.6" stroke-dasharray="8,4" />
+        <rect x="1032" y="119" width="212" height="22" rx="4" fill="#020617" stroke="#cbd5e1" stroke-width="1" />
+        <text x="1138" y="134" fill="#f8fafc" font-size="11" font-weight="700" text-anchor="middle">ON-PREMISE · XY ERP 機房</text>
+
+        <!-- ==================== ARROWS LAYER (drawn BEFORE nodes for z-order) ==================== -->
+        <g id="arrows-layer">
+          <!-- 1. Vue 3 SPA -> Cloud Run FastAPI Web -->
+          <g class="flow-edge" data-flows="web" data-nodes="vue-spa,cloud-run,fastapi-web">
+            <path d="M 234 104 L 312 104 L 312 148" fill="none" stroke="#22d3ee" stroke-width="2" marker-end="url(#arrow-cyan)" />
+            <rect x="239" y="84" width="66" height="16" rx="3" fill="#020617" stroke="#22d3ee" stroke-width="0.8" />
+            <text x="272" y="95" fill="#67e8f9" font-size="8.5" font-weight="700" text-anchor="middle">HTTPS REST</text>
+          </g>
+
+          <!-- 2. Gmail <-> Cloud Run Batch Task -->
+          <g class="flow-edge" data-flows="batch" data-nodes="gmail-api,cloud-run,batch-task">
+            <path d="M 234 248 L 288 248 L 288 162 L 494 162" fill="none" stroke="#fb923c" stroke-width="2" marker-end="url(#arrow-orange)" />
+            <rect x="237" y="254" width="110" height="16" rx="3" fill="#020617" stroke="#fb923c" stroke-width="0.8" />
+            <text x="292" y="265" fill="#fdba74" font-size="8.5" font-weight="700" text-anchor="middle">PDF 附件 / 回信標籤</text>
+          </g>
+
+          <!-- 3. Cloud Run -> Gemini API -->
+          <g class="flow-edge" data-flows="web,batch" data-nodes="cloud-run,fastapi-web,batch-task,mvc-core,gemini-api">
+            <path d="M 678 104 L 712 104" fill="none" stroke="#fb923c" stroke-width="2" marker-end="url(#arrow-orange)" />
+            <rect x="656" y="76" width="84" height="16" rx="3" fill="#020617" stroke="#fb923c" stroke-width="0.8" />
+            <text x="698" y="87" fill="#fdba74" font-size="8.5" font-weight="700" text-anchor="middle">Instant / Batch</text>
+          </g>
+
+          <!-- 4. Cloud Run <-> Firestore -->
+          <g class="flow-edge" data-flows="web,batch" data-nodes="cloud-run,mvc-core,firestore-db">
+            <path d="M 678 234 L 712 234" fill="none" stroke="#a78bfa" stroke-width="2" marker-end="url(#arrow-violet)" />
+            <rect x="652" y="210" width="88" height="16" rx="3" fill="#020617" stroke="#a78bfa" stroke-width="0.8" />
+            <text x="696" y="221" fill="#ddd6fe" font-size="8.5" font-weight="700" text-anchor="middle">Prompt/狀態讀寫</text>
+          </g>
+
+          <!-- 5. Security & Identity -> Cloud Run (Dashed Rose) -->
+          <g class="flow-edge" data-flows="security" data-nodes="gcp-security,cloud-run,auth-orm">
+            <path d="M 714 378 L 690 378 L 690 302 L 666 302" fill="none" stroke="#fb7185" stroke-width="2" stroke-dasharray="5,3" marker-end="url(#arrow-rose)" />
+            <rect x="688" y="340" width="116" height="16" rx="3" fill="#020617" stroke="#fb7185" stroke-width="0.8" />
+            <text x="746" y="351" fill="#fda4af" font-size="8.5" font-weight="700" text-anchor="middle">ADC / Secret / Key</text>
+          </g>
+
+          <!-- 6. Security IAM Signer -> Gmail DWD (Dashed Rose) -->
+          <g class="flow-edge" data-flows="security,batch" data-nodes="gcp-security,gmail-api">
+            <path d="M 714 416 L 129 416 L 129 294" fill="none" stroke="#fb7185" stroke-width="1.8" stroke-dasharray="5,3" marker-end="url(#arrow-rose)" />
+            <rect x="284" y="407" width="176" height="18" rx="3" fill="#020617" stroke="#fb7185" stroke-width="0.8" />
+            <text x="372" y="419" fill="#fda4af" font-size="8.5" font-weight="700" text-anchor="middle">IAM Signer DWD (s@j.com)</text>
+          </g>
+
+          <!-- 7. Cloud Run (ORM) -> VPC Hybrid Tunnel -->
+          <g class="flow-edge" data-flows="web,batch" data-nodes="cloud-run,auth-orm,vpc-tunnel">
+            <path d="M 587 340 L 587 394" fill="none" stroke="#34d399" stroke-width="2" marker-end="url(#arrow-emerald)" />
+            <rect x="524" y="358" width="126" height="16" rx="3" fill="#020617" stroke="#34d399" stroke-width="0.8" />
+            <text x="587" y="369" fill="#6ee7b7" font-size="8.5" font-weight="700" text-anchor="middle">SQLAlchemy / pymssql</text>
+          </g>
+
+          <!-- 8. VPC Hybrid Tunnel -> On-Premise MSSQL ORDER TABLE/ORDER DETAIL TABLE -->
+          <g class="flow-edge" data-flows="web,batch" data-nodes="vpc-tunnel,mssql-orders">
+            <path d="M 678 446 L 998 446 L 998 240 L 1034 240" fill="none" stroke="#a78bfa" stroke-width="2.2" marker-end="url(#arrow-violet)" />
+            <rect x="752" y="437" width="164" height="18" rx="3" fill="#020617" stroke="#a78bfa" stroke-width="0.8" />
+            <text x="834" y="449" fill="#ddd6fe" font-size="8.5" font-weight="700" text-anchor="middle">TCP :1433 · 交易寫入訂單</text>
+          </g>
+
+          <!-- 9. VPC Hybrid Tunnel -> On-Premise ERP Master Tables -->
+          <g class="flow-edge" data-flows="web,batch" data-nodes="vpc-tunnel,mssql-master">
+            <path d="M 678 462 L 1034 462" fill="none" stroke="#22d3ee" stroke-width="1.8" stroke-dasharray="4,3" marker-end="url(#arrow-cyan)" />
+            <rect x="752" y="467" width="164" height="16" rx="3" fill="#020617" stroke="#22d3ee" stroke-width="0.8" />
+            <text x="834" y="478" fill="#67e8f9" font-size="8.5" font-weight="700" text-anchor="middle">Lifespan 讀取快取 7 張主檔</text>
+          </g>
+
+          <!-- 10. GitHub -> Cloud Build -->
+          <g class="flow-edge" data-flows="cicd" data-nodes="github-repo,cloud-build">
+            <path d="M 234 590 L 296 590" fill="none" stroke="#fbbf24" stroke-width="2" marker-end="url(#arrow-amber)" />
+            <rect x="236" y="566" width="58" height="16" rx="3" fill="#020617" stroke="#fbbf24" stroke-width="0.8" />
+            <text x="265" y="577" fill="#fde68a" font-size="8.5" font-weight="700" text-anchor="middle">Git Push</text>
+          </g>
+
+          <!-- 11. Cloud Build -> Artifact Registry -->
+          <g class="flow-edge" data-flows="cicd" data-nodes="cloud-build,artifact-reg">
+            <path d="M 494 590 L 528 590" fill="none" stroke="#fbbf24" stroke-width="2" marker-end="url(#arrow-amber)" />
+          </g>
+
+          <!-- 12. Cloud Build -> GCS Logs Bucket -->
+          <g class="flow-edge" data-flows="cicd" data-nodes="cloud-build,gcs-bucket">
+            <path d="M 396 634 L 396 686 L 864 686 L 864 636" fill="none" stroke="#fbbf24" stroke-width="1.6" stroke-dasharray="4,3" marker-end="url(#arrow-amber)" />
+            <rect x="572" y="677" width="136" height="18" rx="3" fill="#020617" stroke="#fbbf24" stroke-width="0.8" />
+            <text x="640" y="689" fill="#fde68a" font-size="8.5" font-weight="700" text-anchor="middle">建置日誌 (logsBucket)</text>
+          </g>
+
+          <!-- 13. Artifact Registry -> Cloud Run Deploy -->
+          <g class="flow-edge" data-flows="cicd" data-nodes="artifact-reg,cloud-run">
+            <path d="M 628 548 L 628 510 L 420 510 L 420 342" fill="none" stroke="#fbbf24" stroke-width="2" marker-end="url(#arrow-amber)" />
+            <rect x="352" y="499" width="136" height="18" rx="3" fill="#020617" stroke="#fbbf24" stroke-width="0.8" />
+            <text x="420" y="511" fill="#fde68a" font-size="8.5" font-weight="700" text-anchor="middle">部署最新容器映像檔</text>
+          </g>
+        </g>
+
+        <!-- ==================== NODES LAYER ==================== -->
+        <g id="nodes-layer">
+
+          <!-- 1. Vue 3 SPA (Non-GCP: Rounded Rect + Text) -->
+          <g class="arch-node" data-id="vue-spa" data-flows="web">
+            <rect x="24" y="60" width="210" height="88" rx="8" fill="#0f172a" />
+            <rect x="24" y="60" width="210" height="88" rx="8" fill="rgba(8, 51, 68, 0.55)" stroke="#22d3ee" stroke-width="1.8" />
+            <text x="129" y="84" fill="#ffffff" font-size="12.5" font-weight="700" text-anchor="middle">Vue 3 SPA 前端介面</text>
+            <text x="129" y="103" fill="#67e8f9" font-size="9.5" font-weight="600" text-anchor="middle">static/index.html · gmail_checks.html</text>
+            <text x="129" y="121" fill="#cbd5e1" font-size="9" text-anchor="middle">PDF/PNG 上傳 · Prompt 編輯</text>
+            <text x="129" y="136" fill="#cbd5e1" font-size="9" text-anchor="middle">檢核結果預覽 · 觸發寫入 ERP</text>
+          </g>
+
+          <!-- 2. Google Workspace Gmail API (GCP Collaboration SVG) -->
+          <g class="arch-node" data-id="gmail-api" data-flows="batch,security">
+            <rect x="24" y="204" width="210" height="90" rx="8" fill="#0f172a" />
+            <rect x="24" y="204" width="210" height="90" rx="8" fill="rgba(251, 146, 60, 0.22)" stroke="#fb923c" stroke-width="1.8" />
+            <foreignObject x="34" y="216" width="38" height="38">
+              <div xmlns="http://www.w3.org/1999/xhtml" class="icon-badge">
+                <img src="gcp-svg-icons/Collaboration/SVG/Collaboration-512-color.svg" alt="Gmail Workspace" />
+              </div>
+            </foreignObject>
+            <text x="82" y="232" fill="#ffffff" font-size="12" font-weight="700">Gmail API v1</text>
+            <text x="82" y="248" fill="#fdba74" font-size="9.5" font-weight="600">s@j.com</text>
+            <text x="34" y="272" fill="#e2e8f0" font-size="9">• 依 Firestore 條件篩選未讀訂單</text>
+            <text x="34" y="286" fill="#e2e8f0" font-size="9">• 回覆單號 / 套用標籤 / 標記已讀</text>
+          </g>
+
+          <!-- 3. GitHub Repository (Non-GCP: Rounded Rect + Text) -->
+          <g class="arch-node" data-id="github-repo" data-flows="cicd">
+            <rect x="24" y="548" width="210" height="84" rx="8" fill="#0f172a" />
+            <rect x="24" y="548" width="210" height="84" rx="8" fill="rgba(30, 41, 59, 0.72)" stroke="#e2e8f0" stroke-width="1.8" />
+            <text x="129" y="573" fill="#ffffff" font-size="12.5" font-weight="700" text-anchor="middle">GitHub Repository</text>
+            <text x="129" y="592" fill="#f1f5f9" font-size="9.5" font-weight="600" text-anchor="middle">/order_recog</text>
+            <text x="129" y="610" fill="#cbd5e1" font-size="9" text-anchor="middle">master 分支 · Dockerfile</text>
+            <text x="129" y="623" fill="#cbd5e1" font-size="9" text-anchor="middle">Push 自動觸發雲端建置</text>
+          </g>
+
+          <!-- 4. Cloud Run Container Boundary + Internal FastAPI Modules -->
+          <g class="arch-node" data-id="cloud-run" data-flows="web,batch,security,cicd">
+            <rect x="298" y="56" width="380" height="284" rx="10" fill="#0f172a" />
+            <rect x="298" y="56" width="380" height="284" rx="10" fill="rgba(6, 78, 59, 0.28)" stroke="#34d399" stroke-width="2" />
+            <foreignObject x="310" y="66" width="38" height="38">
+              <div xmlns="http://www.w3.org/1999/xhtml" class="icon-badge">
+                <img src="gcp-svg-icons/Serverless Computing/SVG/ServerlessComputing-512-color.svg" alt="Cloud Run" />
+              </div>
+            </foreignObject>
+            <text x="358" y="83" fill="#ffffff" font-size="13" font-weight="700">Cloud Run (Service &amp; Job)</text>
+            <text x="358" y="99" fill="#6ee7b7" font-size="9.5" font-weight="600">Micromamba Python 3.12 · Port 5050 · main.py</text>
+          </g>
+
+          <!-- 4a. FastAPI Web Service (Non-GCP App Module) -->
+          <g class="arch-node" data-id="fastapi-web" data-flows="web">
+            <rect x="314" y="116" width="168" height="66" rx="6" fill="#0f172a" />
+            <rect x="314" y="116" width="168" height="66" rx="6" fill="rgba(6, 78, 59, 0.55)" stroke="#34d399" stroke-width="1.5" />
+            <text x="398" y="136" fill="#ffffff" font-size="11" font-weight="700" text-anchor="middle">FastAPI / Uvicorn</text>
+            <text x="398" y="152" fill="#6ee7b7" font-size="9" font-weight="600" text-anchor="middle">runningmode=service</text>
+            <text x="398" y="168" fill="#cbd5e1" font-size="8.5" text-anchor="middle">Lifespan 啟動快取主檔</text>
+          </g>
+
+          <!-- 4b. Gmail Batch Task (Non-GCP App Module) -->
+          <g class="arch-node" data-id="batch-task" data-flows="batch">
+            <rect x="494" y="116" width="168" height="66" rx="6" fill="#0f172a" />
+            <rect x="494" y="116" width="168" height="66" rx="6" fill="rgba(251, 146, 60, 0.25)" stroke="#fb923c" stroke-width="1.5" />
+            <text x="578" y="136" fill="#ffffff" font-size="11" font-weight="700" text-anchor="middle">Gmail 批次排程任務</text>
+            <text x="578" y="152" fill="#fdba74" font-size="9" font-weight="600" text-anchor="middle">runningmode=task</text>
+            <text x="578" y="168" fill="#cbd5e1" font-size="8.5" text-anchor="middle">斷點續傳 · 掃描轉單通知</text>
+          </g>
+
+          <!-- 4c. MVC Controllers & Preprocessing (Non-GCP App Module) -->
+          <g class="arch-node" data-id="mvc-core" data-flows="web,batch">
+            <rect x="314" y="196" width="348" height="64" rx="6" fill="#0f172a" />
+            <rect x="314" y="196" width="348" height="64" rx="6" fill="rgba(6, 78, 59, 0.48)" stroke="#34d399" stroke-width="1.5" />
+            <text x="488" y="216" fill="#ffffff" font-size="11.5" font-weight="700" text-anchor="middle">MVC Controllers &amp; JSONPath 轉換引擎</text>
+            <text x="488" y="233" fill="#6ee7b7" font-size="9" font-weight="600" text-anchor="middle">ctrl_order · ctrl_genai · ctrl_gmailcheck · ctrl_firestoredb</text>
+            <text x="488" y="249" fill="#cbd5e1" font-size="8.5" text-anchor="middle">preprocess_funcs (rename/insert/merge/concat) · 檢核防呆</text>
+          </g>
+
+          <!-- 4d. Auth & ORM Layer (Non-GCP App Module) -->
+          <g class="arch-node" data-id="auth-orm" data-flows="web,batch,security">
+            <rect x="314" y="274" width="348" height="52" rx="6" fill="#0f172a" />
+            <rect x="314" y="274" width="348" height="52" rx="6" fill="rgba(136, 19, 55, 0.4)" stroke="#fb7185" stroke-width="1.5" />
+            <text x="488" y="295" fill="#ffffff" font-size="11" font-weight="700" text-anchor="middle">憑證偵測與 ORM 持久層</text>
+            <text x="488" y="313" fill="#fda4af" font-size="9" font-weight="600" text-anchor="middle">env_detector (Dev/Prod) · gcp_credentials · SQLAlchemy Automap</text>
+          </g>
+
+          <!-- 5. Gemini Developer API (GCP AI/ML SVG) -->
+          <g class="arch-node" data-id="gemini-api" data-flows="web,batch">
+            <rect x="714" y="56" width="252" height="92" rx="8" fill="#0f172a" />
+            <rect x="714" y="56" width="252" height="92" rx="8" fill="rgba(251, 146, 60, 0.25)" stroke="#fb923c" stroke-width="1.8" />
+            <foreignObject x="724" y="68" width="38" height="38">
+              <div xmlns="http://www.w3.org/1999/xhtml" class="icon-badge">
+                <img src="gcp-svg-icons/AI _ Machine Learning/SVG/AIMachineLearning-512-color.svg" alt="Gemini API" />
+              </div>
+            </foreignObject>
+            <text x="772" y="84" fill="#ffffff" font-size="12" font-weight="700">Gemini Developer API</text>
+            <text x="772" y="100" fill="#fdba74" font-size="9" font-weight="600">generativelanguage.googleapis.com</text>
+            <text x="724" y="122" fill="#e2e8f0" font-size="9">• vertexai=False · File Upload API</text>
+            <text x="724" y="137" fill="#e2e8f0" font-size="9">• ≤20筆即時 / &gt;20筆 Batch Job JSON</text>
+          </g>
+
+          <!-- 6. Cloud Firestore (GCP Databases SVG) -->
+          <g class="arch-node" data-id="firestore-db" data-flows="web,batch">
+            <rect x="714" y="186" width="252" height="104" rx="8" fill="#0f172a" />
+            <rect x="714" y="186" width="252" height="104" rx="8" fill="rgba(76, 29, 149, 0.45)" stroke="#a78bfa" stroke-width="1.8" />
+            <foreignObject x="724" y="198" width="38" height="38">
+              <div xmlns="http://www.w3.org/1999/xhtml" class="icon-badge">
+                <img src="gcp-svg-icons/Databases/SVG/Databases-512-color.svg" alt="Cloud Firestore" />
+              </div>
+            </foreignObject>
+            <text x="772" y="214" fill="#ffffff" font-size="12" font-weight="700">Cloud Firestore</text>
+            <text x="772" y="230" fill="#ddd6fe" font-size="9.5" font-weight="600">NoSQL · (default) Database</text>
+            <text x="724" y="251" fill="#e2e8f0" font-size="8.8">• prompts_and_parsing_instructions</text>
+            <text x="724" y="265" fill="#e2e8f0" font-size="8.8">• gmail_order_scan_configs</text>
+            <text x="724" y="279" fill="#e2e8f0" font-size="8.8">• gmail_parts_scan_create_order_results</text>
+          </g>
+
+          <!-- 7. GCP Security & Identity Group (GCP Security Identity SVG) -->
+          <g class="arch-node" data-id="gcp-security" data-flows="security,batch">
+            <rect x="714" y="326" width="252" height="104" rx="8" fill="#0f172a" />
+            <rect x="714" y="326" width="252" height="104" rx="8" fill="rgba(136, 19, 55, 0.42)" stroke="#fb7185" stroke-width="1.8" stroke-dasharray="5,3" />
+            <foreignObject x="724" y="338" width="38" height="38">
+              <div xmlns="http://www.w3.org/1999/xhtml" class="icon-badge">
+                <img src="gcp-svg-icons/Security Identity/SVG/SecurityIdentity-512-color.svg" alt="Security Identity" />
+              </div>
+            </foreignObject>
+            <text x="772" y="354" fill="#ffffff" font-size="12" font-weight="700">Security &amp; Identity</text>
+            <text x="772" y="370" fill="#fda4af" font-size="9" font-weight="600">純 ADC 無靜態金鑰檔架構</text>
+            <text x="724" y="391" fill="#f1f5f9" font-size="8.8">• Secret Manager: MSSQL 帳密</text>
+            <text x="724" y="405" fill="#f1f5f9" font-size="8.8">• API Keys API: j-gemini-api-key</text>
+            <text x="724" y="419" fill="#f1f5f9" font-size="8.8">• IAM Signer: Gmail DWD 授權</text>
+          </g>
+
+          <!-- 8. VPC / Private Hybrid Network (GCP Networking SVG) -->
+          <g class="arch-node" data-id="vpc-tunnel" data-flows="web,batch">
+            <rect x="496" y="396" width="182" height="82" rx="8" fill="#0f172a" />
+            <rect x="496" y="396" width="182" height="82" rx="8" fill="rgba(8, 51, 68, 0.55)" stroke="#22d3ee" stroke-width="1.8" />
+            <foreignObject x="506" y="408" width="36" height="36">
+              <div xmlns="http://www.w3.org/1999/xhtml" class="icon-badge">
+                <img src="gcp-svg-icons/Networking/SVG/Networking-512-color-rgb.svg" alt="VPC Networking" />
+              </div>
+            </foreignObject>
+            <text x="550" y="423" fill="#ffffff" font-size="11.5" font-weight="700">VPC 混合雲通道</text>
+            <text x="550" y="439" fill="#67e8f9" font-size="9" font-weight="600">Private Connectivity</text>
+            <text x="506" y="463" fill="#e2e8f0" font-size="8.8">• TCP :1433 (timeout 5s)</text>
+          </g>
+
+          <!-- 9. Cloud Build (GCP DevOps SVG) -->
+          <g class="arch-node" data-id="cloud-build" data-flows="cicd">
+            <rect x="298" y="548" width="196" height="86" rx="8" fill="#0f172a" />
+            <rect x="298" y="548" width="196" height="86" rx="8" fill="rgba(120, 53, 15, 0.4)" stroke="#fbbf24" stroke-width="1.8" />
+            <foreignObject x="308" y="560" width="38" height="38">
+              <div xmlns="http://www.w3.org/1999/xhtml" class="icon-badge">
+                <img src="gcp-svg-icons/DevOps/SVG/DevOps-512-color.svg" alt="Cloud Build" />
+              </div>
+            </foreignObject>
+            <text x="355" y="576" fill="#ffffff" font-size="12" font-weight="700">Cloud Build</text>
+            <text x="355" y="592" fill="#fde68a" font-size="9" font-weight="600">cloudbuild_build.yaml</text>
+            <text x="308" y="618" fill="#e2e8f0" font-size="8.8">• Docker Build (--no-cache)</text>
+          </g>
+
+          <!-- 10. Artifact Registry (GCP Containers SVG) -->
+          <g class="arch-node" data-id="artifact-reg" data-flows="cicd">
+            <rect x="530" y="548" width="196" height="86" rx="8" fill="#0f172a" />
+            <rect x="530" y="548" width="196" height="86" rx="8" fill="rgba(120, 53, 15, 0.4)" stroke="#fbbf24" stroke-width="1.8" />
+            <foreignObject x="540" y="560" width="38" height="38">
+              <div xmlns="http://www.w3.org/1999/xhtml" class="icon-badge">
+                <img src="gcp-svg-icons/Containers/SVG/Containers-512-color.svg" alt="Artifact Registry" />
+              </div>
+            </foreignObject>
+            <text x="587" y="576" fill="#ffffff" font-size="12" font-weight="700">Artifact Registry</text>
+            <text x="587" y="592" fill="#fde68a" font-size="9" font-weight="600">us-west1-docker.pkg.dev</text>
+            <text x="540" y="618" fill="#e2e8f0" font-size="8.8">• j-docrecogn-image:latest</text>
+          </g>
+
+          <!-- 11. Cloud Storage Logs Bucket (GCP Storage SVG) -->
+          <g class="arch-node" data-id="gcs-bucket" data-flows="cicd">
+            <rect x="762" y="548" width="204" height="86" rx="8" fill="#0f172a" />
+            <rect x="762" y="548" width="204" height="86" rx="8" fill="rgba(120, 53, 15, 0.4)" stroke="#fbbf24" stroke-width="1.8" />
+            <foreignObject x="772" y="560" width="38" height="38">
+              <div xmlns="http://www.w3.org/1999/xhtml" class="icon-badge">
+                <img src="gcp-svg-icons/Storage/SVG/Storage-512-color.svg" alt="Cloud Storage" />
+              </div>
+            </foreignObject>
+            <text x="819" y="576" fill="#ffffff" font-size="12" font-weight="700">Cloud Storage</text>
+            <text x="819" y="592" fill="#fde68a" font-size="9" font-weight="600">j-docrecogn-bucket</text>
+            <text x="772" y="618" fill="#e2e8f0" font-size="8.8">• Cloud Build logsBucket</text>
+          </g>
+
+          <!-- 12. On-Premise MSSQL Orders Tables (Non-GCP: Rounded Rect + Text) -->
+          <g class="arch-node" data-id="mssql-orders" data-flows="web,batch">
+            <rect x="1036" y="164" width="204" height="152" rx="8" fill="#0f172a" />
+            <rect x="1036" y="164" width="204" height="152" rx="8" fill="rgba(76, 29, 149, 0.48)" stroke="#a78bfa" stroke-width="1.8" />
+            <text x="1138" y="188" fill="#ffffff" font-size="12.5" font-weight="700" text-anchor="middle">XY ERP MSSQL</text>
+            <text x="1138" y="206" fill="#ddd6fe" font-size="9.5" font-weight="600" text-anchor="middle">DB: XTABLENAME.dbo (寫入)</text>
+            <line x1="1050" y1="216" x2="1226" y2="216" stroke="#6d28d9" stroke-width="1" />
+            <text x="1048" y="234" fill="#f8fafc" font-size="9.5" font-weight="700">• ORDER TABLE (訂貨單抬頭)</text>
+            <text x="1056" y="249" fill="#cbd5e1" font-size="8.5"></text>
+            <text x="1048" y="270" fill="#f8fafc" font-size="9.5" font-weight="700">• ORDER DETAIL TABLE (訂貨單明細)</text>
+            <text x="1056" y="285" fill="#cbd5e1" font-size="8.5"></text>
+            <text x="1048" y="305" fill="#fde68a" font-size="8.5" font-weight="600">※ 同 Transaction 原子提交</text>
+          </g>
+
+          <!-- 13. On-Premise MSSQL Master Tables (Non-GCP: Rounded Rect + Text) -->
+          <g class="arch-node" data-id="mssql-master" data-flows="web,batch">
+            <rect x="1036" y="356" width="204" height="194" rx="8" fill="#0f172a" />
+            <rect x="1036" y="356" width="204" height="194" rx="8" fill="rgba(76, 29, 149, 0.35)" stroke="#a78bfa" stroke-width="1.6" />
+            <text x="1138" y="380" fill="#ffffff" font-size="12" font-weight="700" text-anchor="middle">ERP 主檔資料表 (快取)</text>
+            <text x="1138" y="397" fill="#ddd6fe" font-size="9" font-weight="600" text-anchor="middle">檢核防呆與下拉選單來源</text>
+            <line x1="1050" y1="407" x2="1226" y2="407" stroke="#6d28d9" stroke-width="1" />
+            <text x="1048" y="426" fill="#e2e8f0" font-size="9">•  (客戶/廠商主檔)</text>
+            <text x="1048" y="444" fill="#e2e8f0" font-size="9">•  (貨品編號/品名)</text>
+            <text x="1048" y="462" fill="#e2e8f0" font-size="9">•  (倉庫資料表)</text>
+            <text x="1048" y="480" fill="#e2e8f0" font-size="9">•  (部門資料表)</text>
+            <text x="1048" y="498" fill="#e2e8f0" font-size="9">•  (員工資料表)</text>
+            <text x="1048" y="516" fill="#e2e8f0" font-size="9">•  (幣別) ·  (單位)</text>
+            <text x="1048" y="537" fill="#67e8f9" font-size="8.5">/update_cache_data 手動刷新</text>
+          </g>
+        </g>
+
+        <!-- ==================== LEGEND (OUTSIDE ALL BOUNDARIES, y >= 752) ==================== -->
+        <g id="legend" transform="translate(24, 752)">
+          <rect x="0" y="0" width="1236" height="84" rx="8" fill="#0b1224" stroke="#334155" stroke-width="1.2" />
+          <text x="18" y="24" fill="#ffffff" font-size="11" font-weight="700">圖例說明 (LEGEND)</text>
+
+          <!-- Row 1: Semantic Colors -->
+          <rect x="18" y="38" width="14" height="14" rx="3" fill="rgba(8, 51, 68, 0.7)" stroke="#22d3ee" stroke-width="1.5" />
+          <text x="38" y="49" fill="#e2e8f0" font-size="10">前端 / 網路通道</text>
+
+          <rect x="165" y="38" width="14" height="14" rx="3" fill="rgba(6, 78, 59, 0.7)" stroke="#34d399" stroke-width="1.5" />
+          <text x="185" y="49" fill="#e2e8f0" font-size="10">後端運算 (Cloud Run / FastAPI)</text>
+
+          <rect x="388" y="38" width="14" height="14" rx="3" fill="rgba(76, 29, 149, 0.7)" stroke="#a78bfa" stroke-width="1.5" />
+          <text x="408" y="49" fill="#e2e8f0" font-size="10">資料庫 (Firestore / MSSQL)</text>
+
+          <rect x="590" y="38" width="14" height="14" rx="3" fill="rgba(251, 146, 60, 0.45)" stroke="#fb923c" stroke-width="1.5" />
+          <text x="610" y="49" fill="#e2e8f0" font-size="10">AI / Gmail 批次事件流</text>
+
+          <rect x="765" y="38" width="14" height="14" rx="3" fill="rgba(136, 19, 55, 0.65)" stroke="#fb7185" stroke-width="1.5" stroke-dasharray="3,2" />
+          <text x="785" y="49" fill="#e2e8f0" font-size="10">安全憑證 / IAM 授權流</text>
+
+          <rect x="955" y="38" width="14" height="14" rx="3" fill="rgba(120, 53, 15, 0.55)" stroke="#fbbf24" stroke-width="1.5" />
+          <text x="975" y="49" fill="#e2e8f0" font-size="10">GCP CI/CD 與基礎設施</text>
+
+          <!-- Row 2: Icon & Interaction Hints -->
+          <text x="18" y="72" fill="#cbd5e1" font-size="9.5">• 附白色底框 SVG 圖示 = GCP / Google Workspace 服務（使用相對路徑 gcp-svg-icons/...）；純圓角文字方框 = 非 AWS/GCP 獨立元件（Vue 3 / FastAPI / GitHub / XY ERP）。點擊任一節點可於下方檢視詳細資訊。</text>
+        </g>
+      </svg>
+    </div>
+
+    <!-- Interactive Node Inspector -->
+    <div class="inspector" id="node-inspector">
+      <div class="inspector-main">
+        <span class="inspector-tag" id="ins-tag">ARCHITECTURE OVERVIEW</span>
+        <h2 id="ins-title">點擊上方任一架構節點以檢視技術細節與資料表欄位</h2>
+        <p id="ins-desc">
+          本系統支援兩種執行模式：透過 Vue 3 SPA 進行人工上傳、Prompt 測試與檢核寫單（Web Service），以及透過 Cloud Run Job 定時掃描 s@j.com 未讀 PDF 訂單並自動寫入XY ERP XTABLENAME（Batch Task）。
+        </p>
+        <div class="inspector-meta" id="ins-meta">
+          <span class="meta-pill">Python 3.12 + FastAPI</span>
+          <span class="meta-pill">Gemini Instant / Batch API</span>
+          <span class="meta-pill">Pure ADC (無 SA JSON 檔)</span>
+          <span class="meta-pill">MSSQL XTABLENAME.dbo</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Three Summary Cards -->
+    <div class="cards-grid">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-dot emerald"></div>
+          <h3>核心運算與雙模式管線</h3>
+        </div>
+        <ul>
+          <li>• <strong>Web Service</strong>：FastAPI + Uvicorn（Port 5050），啟動時預先快取 7 張 ERP 主檔與 Firestore Prompt 文件。</li>
+          <li>• <strong>Batch Task</strong>：設定 <code>runningmode=task</code> 執行 Gmail 掃描，支援 Gemini Batch Job 斷點續傳與防重複寫單。</li>
+          <li>• <strong>智慧切換</strong>：<code>≤20</code> 筆採即時 <code>generate_content</code>；超過門檻自動切換 Gemini Batch API 降低成本。</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-dot rose"></div>
+          <h3>安全憑證與零金鑰治理</h3>
+        </div>
+        <ul>
+          <li>• <strong>純 ADC 認證</strong>：Dev 與 Prod 皆強制移除 <code>GOOGLE_APPLICATION_CREDENTIALS</code>，徹底淘汰 SA JSON 金鑰檔。</li>
+          <li>• <strong>職責分離</strong>：Secret Manager 僅存 MSSQL 帳密；Gemini API Key 改由 GCP API Keys API 動態讀取並快取。</li>
+          <li>• <strong>Gmail DWD</strong>：透過 <code>google.auth.iam.Signer</code> 無金鑰簽章模擬 <code>s@j.com</code>。</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-dot violet"></div>
+          <h3>XY ERP (XYerp) 資料表對應</h3>
+        </div>
+        <ul>
+          <li>• <strong>ORDER TABLE / ORDER DETAIL TABLE</strong>：寫入 <code>OR_CLASS='3'</code>（客戶訂貨單），依 <code>OR_WKNO</code> 檢查客訂單號防呆並採單一交易提交。</li>
+          <li>• <strong>主檔驗證</strong>：寫入前驗證 <code></code>（客戶）、<code></code>（料號）、<code></code>（幣別）、<code></code>（單位）。</li>
+          <li>• <strong>風險提醒</strong>：XY ERP 修改訂單採「先刪後增（DELETE + INSERT）」，後續若接 Trigger/OLAP 須綜合處理。</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <span>Generated from /order_recog &amp; Google Drive (architecture_icons, XYerp)</span>
+      <span>High-Contrast Dark Architecture Blueprint · 2026-11-22</span>
+    </div>
+  </div>
+
+  <script>
+    const NODE_DETAILS = {
+      'vue-spa': {
+        tag: 'FRONTEND · NON-GCP',
+        title: 'Vue 3 SPA 前端介面 (static/)',
+        desc: '提供業務與維運人員操作介面：上傳 PDF/PNG 訂單、編輯各客戶專屬 Gemini Prompt 與 JSONPath 預處理規則、檢視 13 項送單前邏輯檢核，以及維護 Gmail 自動掃描設定。',
+        meta: ['static/index.html', 'static/gmail_checks.html', 'static/script.js', 'Vue 3 + Tailwind / Bootstrap']
+      },
+      'gmail-api': {
+        tag: 'GOOGLE WORKSPACE · COLLABORATION',
+        title: 'Gmail API v1 (s@j.com)',
+        desc: '透過 Domain-Wide Delegation 存取業務信箱，依 Firestore 設定之查詢語法（如 is:unread has:attachment filename:pdf）擷取訂單附件；轉單完成後自動回覆 ERP 單號、套用標籤並標記已讀。',
+        meta: ['scopes: gmail.readonly, gmail.modify', 'Subject: s@j.com', 'ctrl_gmailcheck.py']
+      },
+      'github-repo': {
+        tag: 'SOURCE CONTROL · NON-GCP',
+        title: 'GitHub Repository (/order_recog)',
+        desc: '儲存專案程式碼、Dockerfile、Conda 環境定義（environment.yml）、單元測試（tests/）與設計規格文件；推送至 master 分支時自動觸發 GCP Cloud Build。',
+        meta: ['Branch: master', 'Python 3.12', 'pytest 單元測試']
+      },
+      'cloud-run': {
+        tag: 'GCP SERVERLESS COMPUTING',
+        title: 'Cloud Run (Web Service & Batch Job)',
+        desc: '單一容器映像檔透過環境變數 runningmode 支援兩種運作模式：預設啟動 FastAPI Web 服務（Port 5050），或設為 task 執行單次 Gmail 批次掃描轉單作業。',
+        meta: ['mambaorg/micromamba:ubuntu', 'Port 5050', 'UVICORN_TIMEOUT=2000s']
+      },
+      'fastapi-web': {
+        tag: 'BACKEND RUNTIME · NON-GCP',
+        title: 'FastAPI / Uvicorn Web Service',
+        desc: '掛載四大 Router（/customer_order、/genai、/gmailcheck、/firestoredb）與靜態前端；lifespan 啟動時測試 MSSQL TCP 連通並快取 7 張 ERP 主檔與 Prompt 文件。',
+        meta: ['main.py', 'runningmode=service', '/update_cache_data']
+      },
+      'batch-task': {
+        tag: 'BATCH WORKER · NON-GCP',
+        title: 'Gmail 自動掃描轉單任務',
+        desc: '讀取 Firestore 所有掃描設定，比對已處理紀錄以支援 Gemini Batch Job 斷點續傳；依序執行 AI 辨識、JSONPath 轉換、OR_WKNO 防重、欄位檢核、寫入 ERP 與回信通知。',
+        meta: ['runningmode=task', 'initiate_gmail_check_write_orders()', '斷點續傳機制']
+      },
+      'mvc-core': {
+        tag: 'APPLICATION LOGIC · NON-GCP',
+        title: 'MVC Controllers & JSONPath 預處理引擎',
+        desc: '將 Gemini 輸出的結構化 JSON 透過 parse_instructions（rename、insert、merge、concatenate）映射為XY ERP 欄位，並執行 13 項送單前防呆驗證（do_check_before_submit）。',
+        meta: ['ctrl_order.py', 'ctrl_genai.py', 'preprocess_funcs.py', 'jsonpath-ng + Pydantic']
+      },
+      'auth-orm': {
+        tag: 'INFRA ADAPTER · NON-GCP',
+        title: '環境偵測、憑證載入與 SQLAlchemy ORM',
+        desc: 'env_detector 依 .env.dev 存在與否隔離 Dev/Prod；models_general.py 以 SQLAlchemy Automap 動態反射 9 張XY ERP 資料表，無需手動維護冗長 ORM 欄位。',
+        meta: ['env_detector.py', 'gcp_credentials.py', 'custom_db.py', 'SQLAlchemy Automap']
+      },
+      'gemini-api': {
+        tag: 'AI / MACHINE LEARNING',
+        title: 'Gemini Developer API (google-genai)',
+        desc: '強制設定 vertexai=False 呼叫 generativelanguage.googleapis.com。先以 Files Upload API 上傳 PDF/PNG，再依筆數自動切換 Instant（≤20）或 Batch API（>20），並以 Pydantic Schema 強制 JSON 輸出。',
+        meta: ['response_schema: GeminiResponseOfPurchaseOrder', 'File Upload API', 'Instant / Batch 自動切換']
+      },
+      'firestore-db': {
+        tag: 'GCP NOSQL DATABASE',
+        title: 'Cloud Firestore ((default) Database)',
+        desc: '儲存三組核心集合：客戶 Prompt 與欄位轉換規則（prompts_and_parsing_instructions）、Gmail 掃描條件（gmail_order_scan_configs）、附件處理追蹤與 Batch Job 斷點紀錄（gmail_parts_scan_create_order_results）。',
+        meta: ['3 Core Collections', 'Base64 URL-safe Doc ID', 'ctrl_firestoredb.py']
+      },
+      'gcp-security': {
+        tag: 'GCP SECURITY & IDENTITY',
+        title: '純 ADC 安全憑證架構',
+        desc: '徹底移除 GOOGLE_APPLICATION_CREDENTIALS 金鑰檔：Prod 透過 Secret Manager 讀取 MSSQL 帳密（erp-sql-server-manipulate-idpw）、透過 GCP API Keys API 動態取得 j-gemini-api-key，並以 IAM Signer 完成 Gmail DWD 簽章。',
+        meta: ['Secret Manager (MSSQL Only)', 'API Keys API (Gemini Key)', 'IAM Signer (Gmail DWD)']
+      },
+      'vpc-tunnel': {
+        tag: 'GCP NETWORKING',
+        title: 'VPC / 混合雲安全連線通道',
+        desc: '銜接 GCP Cloud Run 與地端機房XY ERP MSSQL Server（TCP 1433），啟動時先執行 5 秒 Socket 連通探測，並設定 pymssql 連線逾時保護。',
+        meta: ['TCP :1433', 'Timeout: 5s', 'Hybrid Cloud Private Access']
+      },
+      'cloud-build': {
+        tag: 'GCP DEVOPS · CI/CD',
+        title: 'Cloud Build 自動建置管線',
+        desc: '監聽 GitHub master 分支推送事件，依據 cloudbuild_build.yaml 執行 git checkout、docker build (--no-cache) 與 docker push，並將建置日誌寫入指定 GCS Bucket。',
+        meta: ['cloudbuild_build.yaml', 'gcr.io/cloud-builders/docker']
+      },
+      'artifact-reg': {
+        tag: 'GCP CONTAINERS',
+        title: 'Artifact Registry 容器映像倉庫',
+        desc: '託管建置完成的 order_recog Docker 映像檔，供 Cloud Run Service 與 Cloud Run Job 拉取部署。',
+        meta: ['us-west1-docker.pkg.dev', 'j-docrecogn-registry', 'j-docrecogn-image:latest']
+      },
+      'gcs-bucket': {
+        tag: 'GCP STORAGE',
+        title: 'Cloud Storage (gs://j-docrecogn-bucket)',
+        desc: '作為 Cloud Build 的專屬 logsBucket，集中保存每次容器建置與推送之稽核日誌。',
+        meta: ['gs://j-docrecogn-bucket', 'Build Logs']
+      },
+      'mssql-orders': {
+        tag: 'ON-PREMISE MSSQL · XTABLENAME.dbo',
+        title: 'XY ERP 訂單核心表 (ORDER TABLE & ORDER DETAIL TABLE)',
+        desc: '寫入客戶訂貨單（OR_CLASS / OD_CLASS = "3"）。寫入前以 OR_WKNO 查重避免重複建單，依日期產生流水號 OR_NO（YYYYMMDD0001），並於單一 SQLAlchemy Transaction 內原子提交抬頭與明細。',
+        meta: ['ORDER TABLE: OR_NO, OR_WKNO, OR_CTNO, OR_DATE1/2, OR_TOT', 'ORDER DETAIL TABLE: OD_NO, OD_SEQFLD, OD_SKNO, OD_QTY, OD_PRICE, OD_SPECD']
+      },
+      'mssql-master': {
+        tag: 'ON-PREMISE MSSQL · READ CACHE',
+        title: 'XY ERP 7 張唯讀主檔資料表',
+        desc: '於 FastAPI 啟動時一次載入記憶體快取，供前端下拉選單與送單前 13 項防呆檢核使用（驗證客戶代號、貨品編號、幣別、單位等是否合法）。',
+        meta: [' (客戶/廠商)', ' (貨品)', ' (倉庫)', ' (部門)', ' (員工)', ' (幣別)', ' (單位)']
+      }
+    };
+
+    const nodes = document.querySelectorAll('.arch-node');
+    const edges = document.querySelectorAll('.flow-edge');
+    const filterBtns = document.querySelectorAll('.filter-btn');
+
+    function updateInspector(nodeId) {
+      const info = NODE_DETAILS[nodeId];
+      if (!info) return;
+      document.getElementById('ins-tag').textContent = info.tag;
+      document.getElementById('ins-title').textContent = info.title;
+      document.getElementById('ins-desc').textContent = info.desc;
+      const metaEl = document.getElementById('ins-meta');
+      metaEl.innerHTML = info.meta.map(m => `<span class="meta-pill">${m}</span>`).join('');
+    }
+
+    function applyFlowFilter(flow) {
+      filterBtns.forEach(b => b.classList.toggle('active', b.dataset.flow === flow));
+      nodes.forEach(n => {
+        n.classList.remove('selected');
+        if (flow === 'all') {
+          n.classList.remove('dimmed');
+        } else {
+          const list = (n.dataset.flows || '').split(',');
+          n.classList.toggle('dimmed', !list.includes(flow));
+        }
+      });
+      edges.forEach(e => {
+        if (flow === 'all') {
+          e.classList.remove('dimmed', 'highlighted');
+        } else {
+          const list = (e.dataset.flows || '').split(',');
+          const match = list.includes(flow);
+          e.classList.toggle('dimmed', !match);
+          e.classList.toggle('highlighted', match);
+        }
+      });
+    }
+
+    filterBtns.forEach(btn => {
+      btn.addEventListener('click', () => applyFlowFilter(btn.dataset.flow));
+    });
+
+    nodes.forEach(node => {
+      node.addEventListener('click', () => {
+        const id = node.dataset.id;
+        updateInspector(id);
+        nodes.forEach(n => {
+          n.classList.remove('dimmed');
+          n.classList.toggle('selected', n.dataset.id === id);
+        });
+        edges.forEach(e => {
+          const connected = (e.dataset.nodes || '').split(',').includes(id);
+          e.classList.toggle('dimmed', !connected);
+          e.classList.toggle('highlighted', connected);
+        });
+        filterBtns.forEach(b => b.classList.remove('active'));
+      });
+    });
+
+    // Export Toolbar Logic
+    function toggleToolbar() {
+      document.getElementById('export-toolbar').classList.toggle('open');
+    }
+
+    async function captureCanvas() {
+      const target = document.getElementById('report-container');
+      const rect = target.getBoundingClientRect();
+      const pad = 32;
+      return html2canvas(document.body, {
+        backgroundColor: '#020617',
+        scale: 2,
+        useCORS: true,
+        x: Math.max(0, rect.left + window.scrollX - pad),
+        y: Math.max(0, rect.top + window.scrollY - pad),
+        width: rect.width + pad * 2,
+        height: rect.height + pad * 2,
+        ignoreElements: el => el.classList && (el.classList.contains('toolbar') || el.classList.contains('filter-bar'))
+      });
+    }
+
+    async function copyAsImage() {
+      try {
+        const canvas = await captureCanvas();
+        canvas.toBlob(async blob => {
+          await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+          alert('已將高解析度架構圖複製到剪貼簿！');
+        });
+      } catch (err) {
+        alert('複製失敗（需於 https 或 localhost 環境執行）：' + err.message);
+      }
+    }
+
+    async function downloadPNG() {
+      const canvas = await captureCanvas();
+      const a = document.createElement('a');
+      a.download = 'order_recog_architecture.png';
+      a.href = canvas.toDataURL('image/png');
+      a.click();
+    }
+
+    async function downloadPDF() {
+      const canvas = await captureCanvas();
+      const imgData = canvas.toDataURL('image/png');
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF({
+        orientation: canvas.width > canvas.height ? 'landscape' : 'portrait',
+        unit: 'px',
+        format: [canvas.width / 2, canvas.height / 2]
+      });
+      pdf.addImage(imgData, 'PNG', 0, 0, canvas.width / 2, canvas.height / 2);
+      pdf.save('order_recog_architecture.pdf');
+    }
+  </script>
+</body>
+</html>

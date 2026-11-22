@@ -1,0 +1,1089 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>j DB Forensic — MSSQL 2025 雙軌資料庫鑑識架構圖</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"
+          integrity="sha384-ZZ1pncU3bQe8y31yfZdMFdSpttDoPmOZg2wguVK9almUodir1PghgT0eY7Mrty8H"
+          crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"
+          integrity="sha384-en/ztfPSRkGfME4KIm05joYXynqzUgbsG5nMrj/xEFAHXkeZfO3yMK8QQ+mP7p1/"
+          crossorigin="anonymous"></script>
+  <style>
+    :root {
+      --bg-canvas: #020617;
+      --bg-card: #0f172a;
+      --bg-elevated: #1e293b;
+      --border-subtle: #334155;
+      --text-primary: #f8fafc;
+      --text-secondary: #cbd5e1;
+      --text-muted: #94a3b8;
+
+      --c-frontend: #22d3ee;
+      --c-frontend-bg: rgba(8, 51, 68, 0.55);
+      --c-backend: #34d399;
+      --c-backend-bg: rgba(6, 78, 59, 0.55);
+      --c-db: #a78bfa;
+      --c-db-bg: rgba(76, 29, 149, 0.50);
+      --c-cloud: #fbbf24;
+      --c-cloud-bg: rgba(120, 53, 15, 0.45);
+      --c-sec: #fb7185;
+      --c-sec-bg: rgba(136, 19, 55, 0.55);
+      --c-bus: #fb923c;
+      --c-bus-bg: rgba(251, 146, 60, 0.35);
+      --c-ext: #cbd5e1;
+      --c-ext-bg: rgba(30, 41, 59, 0.78);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg-canvas);
+      color: var(--text-primary);
+      font-family: 'JetBrains Mono', 'Noto Sans TC', monospace, sans-serif;
+      padding: 24px;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1320px;
+      margin: 0 auto;
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 18px;
+      flex-wrap: wrap;
+    }
+
+    .title-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .title-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .pulse-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--c-backend);
+      box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.7);
+      animation: pulse 2s infinite;
+      flex-shrink: 0;
+    }
+
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.7); }
+      70% { box-shadow: 0 0 0 10px rgba(52, 211, 153, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0); }
+    }
+
+    h1 {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--text-primary);
+      letter-spacing: -0.01em;
+    }
+
+    .subtitle {
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    /* Export Toolbar */
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      position: relative;
+    }
+
+    .toolbar-actions {
+      display: none;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .toolbar.open .toolbar-actions {
+      display: flex;
+    }
+
+    .toolbar-btn, .toolbar-toggle {
+      background: var(--bg-card);
+      color: var(--text-primary);
+      border: 1px solid var(--border-subtle);
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-family: inherit;
+      font-size: 12px;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+    }
+
+    .toolbar-btn:hover, .toolbar-toggle:hover {
+      background: var(--bg-elevated);
+      border-color: var(--c-frontend);
+    }
+
+    /* Interactive Filter Bar */
+    .filter-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 14px;
+      flex-wrap: wrap;
+    }
+
+    .filter-label {
+      font-size: 11px;
+      color: var(--text-secondary);
+      margin-right: 4px;
+    }
+
+    .filter-pill {
+      background: var(--bg-card);
+      color: var(--text-secondary);
+      border: 1px solid var(--border-subtle);
+      border-radius: 999px;
+      padding: 5px 12px;
+      font-family: inherit;
+      font-size: 11px;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+
+    .filter-pill:hover {
+      border-color: var(--c-frontend);
+      color: var(--text-primary);
+    }
+
+    .filter-pill.active {
+      background: rgba(34, 211, 238, 0.18);
+      border-color: var(--c-frontend);
+      color: #ffffff;
+      font-weight: 600;
+    }
+
+    /* Main Diagram Card */
+    .diagram-card {
+      background: var(--bg-canvas);
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      padding: 16px;
+      overflow-x: auto;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55);
+    }
+
+    .diagram-stage {
+      position: relative;
+      width: 1240px;
+      height: 820px;
+      margin: 0 auto;
+      background: var(--bg-canvas);
+    }
+
+    .diagram-svg {
+      position: absolute;
+      inset: 0;
+      width: 1240px;
+      height: 820px;
+      pointer-events: none;
+    }
+
+    /* HTML Component Nodes layered cleanly over SVG edges */
+    .node {
+      position: absolute;
+      border-radius: 8px;
+      background-color: #0f172a; /* Opaque mask behind translucent tint */
+      cursor: pointer;
+      transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.2s ease;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    .node-inner {
+      width: 100%;
+      height: 100%;
+      padding: 8px 10px;
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      border-radius: 7px;
+    }
+
+    .node-inner.centered {
+      flex-direction: column;
+      justify-content: center;
+      text-align: center;
+      gap: 3px;
+    }
+
+    .node:hover {
+      transform: translateY(-2px);
+      z-index: 20;
+    }
+
+    .node.selected {
+      box-shadow: 0 0 0 2px #ffffff, 0 0 22px rgba(34, 211, 238, 0.55);
+      z-index: 25;
+    }
+
+    .node.dimmed {
+      opacity: 0.22;
+    }
+
+    .edge-group {
+      transition: opacity 0.2s ease;
+    }
+
+    .edge-group.dimmed {
+      opacity: 0.12;
+    }
+
+    /* Semantic Node Themes (High Contrast) */
+    .theme-frontend { border: 1.5px solid var(--c-frontend); }
+    .theme-frontend .node-inner { background: var(--c-frontend-bg); }
+    .theme-frontend:hover { box-shadow: 0 0 18px rgba(34, 211, 238, 0.4); }
+
+    .theme-backend { border: 1.5px solid var(--c-backend); }
+    .theme-backend .node-inner { background: var(--c-backend-bg); }
+    .theme-backend:hover { box-shadow: 0 0 18px rgba(52, 211, 153, 0.4); }
+
+    .theme-db { border: 1.5px solid var(--c-db); }
+    .theme-db .node-inner { background: var(--c-db-bg); }
+    .theme-db:hover { box-shadow: 0 0 18px rgba(167, 139, 250, 0.45); }
+
+    .theme-cloud { border: 1.5px solid var(--c-cloud); }
+    .theme-cloud .node-inner { background: var(--c-cloud-bg); }
+    .theme-cloud:hover { box-shadow: 0 0 18px rgba(251, 191, 36, 0.4); }
+
+    .theme-sec { border: 1.5px solid var(--c-sec); }
+    .theme-sec .node-inner { background: var(--c-sec-bg); }
+    .theme-sec:hover { box-shadow: 0 0 18px rgba(251, 113, 133, 0.45); }
+
+    .theme-bus { border: 1.5px solid var(--c-bus); }
+    .theme-bus .node-inner { background: var(--c-bus-bg); }
+    .theme-bus:hover { box-shadow: 0 0 18px rgba(251, 146, 60, 0.45); }
+
+    .theme-ext { border: 1.5px solid var(--c-ext); }
+    .theme-ext .node-inner { background: var(--c-ext-bg); }
+    .theme-ext:hover { box-shadow: 0 0 18px rgba(203, 213, 225, 0.35); }
+
+    .node-icon {
+      width: 30px;
+      height: 30px;
+      flex-shrink: 0;
+      object-fit: contain;
+      filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.6));
+    }
+
+    .node-text {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 0;
+    }
+
+    .node-title {
+      font-size: 11.5px;
+      font-weight: 700;
+      color: #ffffff;
+      line-height: 1.25;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .node-sub {
+      font-size: 9.5px;
+      color: #e2e8f0;
+      line-height: 1.25;
+    }
+
+    .node-badge {
+      display: inline-block;
+      margin-top: 2px;
+      font-size: 8.5px;
+      font-weight: 600;
+      padding: 1px 5px;
+      border-radius: 4px;
+      background: rgba(2, 6, 23, 0.72);
+      color: #fde68a;
+      border: 1px solid rgba(251, 191, 36, 0.45);
+      width: fit-content;
+    }
+
+    .node-badge.sec {
+      color: #fecdd3;
+      border-color: rgba(251, 113, 133, 0.6);
+    }
+
+    /* Interactive Inspector Bar */
+    .inspector {
+      margin-top: 14px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-left: 4px solid var(--c-frontend);
+      border-radius: 8px;
+      padding: 12px 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .inspector-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: #ffffff;
+      margin-bottom: 4px;
+    }
+
+    .inspector-desc {
+      font-size: 11.5px;
+      color: var(--text-secondary);
+      line-height: 1.5;
+      max-width: 960px;
+    }
+
+    .inspector-meta {
+      font-size: 10.5px;
+      color: var(--c-frontend);
+      background: rgba(8, 51, 68, 0.6);
+      border: 1px solid rgba(34, 211, 238, 0.4);
+      padding: 4px 8px;
+      border-radius: 6px;
+      white-space: nowrap;
+    }
+
+    /* Summary Cards */
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-top: 16px;
+    }
+
+    @media (max-width: 960px) {
+      .cards-grid { grid-template-columns: 1fr; }
+    }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-subtle);
+      border-radius: 10px;
+      padding: 16px;
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .card-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+    }
+
+    .card h3 {
+      font-size: 13px;
+      font-weight: 700;
+      color: #ffffff;
+    }
+
+    .card ul {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 11px;
+      color: var(--text-secondary);
+      line-height: 1.45;
+    }
+
+    .card li strong {
+      color: #ffffff;
+    }
+
+    .footer {
+      margin-top: 16px;
+      padding-top: 12px;
+      border-top: 1px solid #1e293b;
+      display: flex;
+      justify-content: space-between;
+      font-size: 10.5px;
+      color: var(--text-muted);
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    @media print {
+      .toolbar, .filter-bar { display: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <div id="report-container" class="container">
+    <!-- Header -->
+    <div class="header">
+      <div class="title-group">
+        <div class="title-row">
+          <div class="pulse-dot"></div>
+          <h1>j DB Forensic — MSSQL 2025 雙軌資料庫鑑識架構</h1>
+        </div>
+        <div class="subtitle">
+          Repo: jp/j-db-forensic · Target: XY ERP 5.X [XTABLENAME] on SQL Server 2025 Express · Pure On-Premises LAN
+        </div>
+      </div>
+
+      <div class="toolbar" id="export-toolbar">
+        <div class="toolbar-actions">
+          <button class="toolbar-btn" onclick="copyAsImage()">📋 Copy</button>
+          <button class="toolbar-btn" onclick="downloadPNG()">🖼️ PNG</button>
+          <button class="toolbar-btn" onclick="downloadPDF()">📄 PDF</button>
+        </div>
+        <button class="toolbar-toggle" onclick="toggleToolbar()" title="匯出選項">⋯</button>
+      </div>
+    </div>
+
+    <!-- Interactive View Filter -->
+    <div class="filter-bar">
+      <span class="filter-label">視角篩選：</span>
+      <button class="filter-pill active" data-filter="all" onclick="setFilter('all', this)">全部架構</button>
+      <button class="filter-pill" data-filter="capture" onclick="setFilter('capture', this)">雙軌即時擷取</button>
+      <button class="filter-pill" data-filter="security" onclick="setFilter('security', this)">機械式防寫防線</button>
+      <button class="filter-pill" data-filter="offline" onclick="setFilter('offline', this)">離線分析與轉譯</button>
+      <button class="filter-pill" data-filter="mes" onclick="setFilter('mes', this)">MES 與 CNC 整合應用</button>
+    </div>
+
+    <!-- Main Interactive Diagram -->
+    <div class="diagram-card">
+      <div class="diagram-stage" id="diagram-stage">
+        <!-- SVG Layer: Grid, Boundaries, Connectors, Legend -->
+        <svg class="diagram-svg" viewBox="0 0 1240 820" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+              <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" stroke-width="0.6" />
+            </pattern>
+            <marker id="arrow-cyan" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+              <polygon points="0 0, 10 3.5, 0 7" fill="#22d3ee" />
+            </marker>
+            <marker id="arrow-emerald" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+              <polygon points="0 0, 10 3.5, 0 7" fill="#34d399" />
+            </marker>
+            <marker id="arrow-violet" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+              <polygon points="0 0, 10 3.5, 0 7" fill="#a78bfa" />
+            </marker>
+            <marker id="arrow-rose" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+              <polygon points="0 0, 10 3.5, 0 7" fill="#fb7185" />
+            </marker>
+            <marker id="arrow-amber" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+              <polygon points="0 0, 10 3.5, 0 7" fill="#fbbf24" />
+            </marker>
+            <marker id="arrow-orange" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+              <polygon points="0 0, 10 3.5, 0 7" fill="#fb923c" />
+            </marker>
+          </defs>
+
+          <!-- Background Grid -->
+          <rect width="1240" height="820" fill="#020617" />
+          <rect width="1240" height="820" fill="url(#grid)" />
+
+          <!-- ==================== ZONE BOUNDARIES ==================== -->
+          <!-- Zone 1: Client & AI Agent -->
+          <rect x="20" y="24" width="290" height="320" rx="12" fill="rgba(8, 51, 68, 0.14)" stroke="#22d3ee" stroke-width="1.5" stroke-dasharray="8,4" />
+          <text x="34" y="45" fill="#22d3ee" font-size="11" font-weight="700">1. 操作端與 AI 協作層 (On-Premises)</text>
+
+          <!-- Zone 2: MSSQL 2025 Express Server -->
+          <rect x="345" y="24" width="535" height="320" rx="12" fill="rgba(76, 29, 149, 0.14)" stroke="#a78bfa" stroke-width="1.5" stroke-dasharray="8,4" />
+          <text x="360" y="45" fill="#c4b5fd" font-size="11" font-weight="700">2. 地端 SQL Server 2025 Express</text>
+
+          <!-- Security Group around Prod DB -->
+          <rect x="362" y="60" width="250" height="268" rx="8" fill="rgba(136, 19, 55, 0.12)" stroke="#fb7185" stroke-width="1.4" stroke-dasharray="4,4" />
+          <text x="372" y="77" fill="#fda4af" font-size="9.5" font-weight="700">🔒 正式庫唯讀邊界 (DENY DML/DDL)</text>
+
+          <!-- Zone 3: Forensic CLI Engine -->
+          <rect x="345" y="380" width="535" height="335" rx="12" fill="rgba(6, 78, 59, 0.14)" stroke="#34d399" stroke-width="1.5" stroke-dasharray="8,4" />
+          <text x="360" y="401" fill="#6ee7b7" font-size="11" font-weight="700">3. 鑑識 CLI 核心引擎 (erp_forensic · Python 3.10+ / Conda)</text>
+
+          <!-- Zone 4: Local Forensic Artifacts -->
+          <rect x="20" y="380" width="290" height="335" rx="12" fill="rgba(30, 41, 59, 0.25)" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="8,4" />
+          <text x="34" y="401" fill="#e2e8f0" font-size="11" font-weight="700">4. 本地產出與離線重分析 (Git-Ignored)</text>
+
+          <!-- Zone 5: Downstream MES & Knowledge Ecosystem -->
+          <rect x="915" y="24" width="305" height="691" rx="12" fill="rgba(120, 53, 15, 0.14)" stroke="#fbbf24" stroke-width="1.5" stroke-dasharray="8,4" />
+          <text x="930" y="45" fill="#fde68a" font-size="11" font-weight="700">5. 去敏食譜與下游 MES / CNC 生態系</text>
+
+          <!-- ==================== CONNECTION ARROWS ==================== -->
+          <!-- Operator -> localhost with ERP -->
+          <g class="edge-group" data-flows="capture">
+            <line x1="165" y1="128" x2="165" y2="162" stroke="#22d3ee" stroke-width="1.8" marker-end="url(#arrow-cyan)" />
+            <text x="173" y="149" fill="#67e8f9" font-size="8.5" font-weight="600">執行 A1–E18 動作</text>
+          </g>
+
+          <!-- localhost with ERP -> [XTABLENAME] -->
+          <g class="edge-group" data-flows="capture">
+            <path d="M 295 198 L 376 198" fill="none" stroke="#22d3ee" stroke-width="2" marker-end="url(#arrow-cyan)" />
+            <text x="335" y="190" fill="#67e8f9" font-size="8.5" font-weight="600" text-anchor="middle">LYS / LTSXM</text>
+          </g>
+
+          <!-- [XTABLENAME] -> Extended Events -->
+          <g class="edge-group" data-flows="capture">
+            <line x1="487" y1="165" x2="487" y2="232" stroke="#a78bfa" stroke-width="1.8" marker-end="url(#arrow-violet)" />
+            <text x="495" y="203" fill="#ddd6fe" font-size="8.5" font-weight="600">XEvents 監聽 (*.xel)</text>
+          </g>
+
+          <!-- [XTABLENAME] -> [XTABLENAME_SANDBOX] (.bak restore) -->
+          <g class="edge-group" data-flows="security offline">
+            <path d="M 596 125 L 642 125" fill="none" stroke="#a78bfa" stroke-width="1.6" stroke-dasharray="5,3" marker-end="url(#arrow-violet)" />
+            <text x="619" y="117" fill="#ddd6fe" font-size="8" text-anchor="middle">.bak 還原</text>
+          </g>
+
+          <!-- AI Agent -> Forensic CLI (start/stop/analyze) -->
+          <g class="edge-group" data-flows="capture offline">
+            <path d="M 295 292 L 325 292 L 325 450 L 360 450" fill="none" stroke="#22d3ee" stroke-width="1.8" marker-end="url(#arrow-cyan)" />
+            <text x="325" y="368" fill="#67e8f9" font-size="8.5" font-weight="600" text-anchor="middle">CLI 操控</text>
+          </g>
+
+          <!-- Guard -> [XTABLENAME] (Read-Only + XE DDL) -->
+          <g class="edge-group" data-flows="security capture">
+            <path d="M 470 416 L 470 315" fill="none" stroke="#fb7185" stroke-width="2" stroke-dasharray="5,3" marker-end="url(#arrow-rose)" />
+            <text x="412" y="368" fill="#fda4af" font-size="8.5" font-weight="600">唯讀 SELECT / XE DDL</text>
+          </g>
+
+          <!-- Guard -> [XTABLENAME_SANDBOX] (verify-replay) -->
+          <g class="edge-group" data-flows="security offline">
+            <path d="M 750 416 L 750 176" fill="none" stroke="#fb7185" stroke-width="1.8" stroke-dasharray="5,3" marker-end="url(#arrow-rose)" />
+            <text x="758" y="290" fill="#fda4af" font-size="8.5" font-weight="600">verify-replay</text>
+            <text x="758" y="302" fill="#fda4af" font-size="8">(rollback-only)</text>
+          </g>
+
+          <!-- Guard -> Collection Modules -->
+          <g class="edge-group" data-flows="capture security">
+            <line x1="612" y1="478" x2="612" y2="508" stroke="#34d399" stroke-width="1.8" marker-end="url(#arrow-emerald)" />
+          </g>
+
+          <!-- Collection -> Correlator -->
+          <g class="edge-group" data-flows="capture offline">
+            <line x1="510" y1="572" x2="510" y2="616" stroke="#34d399" stroke-width="1.8" marker-end="url(#arrow-emerald)" />
+            <text x="448" y="598" fill="#6ee7b7" font-size="8.5">raw_events + diffs</text>
+          </g>
+
+          <!-- Correlator -> Synthesizer -->
+          <g class="edge-group" data-flows="offline">
+            <line x1="610" y1="656" x2="636" y2="656" stroke="#34d399" stroke-width="1.8" marker-end="url(#arrow-emerald)" />
+          </g>
+
+          <!-- Collection/Correlator -> Local Artifacts -->
+          <g class="edge-group" data-flows="capture offline">
+            <path d="M 364 540 L 296 540" fill="none" stroke="#fb923c" stroke-width="1.8" marker-end="url(#arrow-orange)" />
+            <text x="330" y="532" fill="#fdba74" font-size="8" font-weight="600" text-anchor="middle">無損封存</text>
+          </g>
+
+          <!-- Local Artifacts -> Offline Analyzer -> Correlator -->
+          <g class="edge-group" data-flows="offline">
+            <line x1="165" y1="600" x2="165" y2="624" stroke="#fb923c" stroke-width="1.6" marker-end="url(#arrow-orange)" />
+            <path d="M 296 660 L 364 660" fill="none" stroke="#fb923c" stroke-width="1.8" stroke-dasharray="4,3" marker-end="url(#arrow-orange)" />
+            <text x="330" y="652" fill="#fdba74" font-size="8" font-weight="600" text-anchor="middle">離線重切</text>
+          </g>
+
+          <!-- Synthesizer -> Sanitized Recipes -->
+          <g class="edge-group" data-flows="offline mes">
+            <path d="M 862 656 L 896 656 L 896 115 L 932 115" fill="none" stroke="#fbbf24" stroke-width="2" marker-end="url(#arrow-amber)" />
+            <text x="896" y="370" fill="#fde68a" font-size="8.5" font-weight="700" text-anchor="middle" transform="rotate(-90 896 370)">去敏化 SQL / SQLAlchemy 範本</text>
+          </g>
+
+          <!-- Recipes -> Data Schemas -->
+          <g class="edge-group" data-flows="mes">
+            <line x1="1068" y1="158" x2="1068" y2="196" stroke="#fbbf24" stroke-width="1.8" marker-end="url(#arrow-amber)" />
+          </g>
+
+          <!-- Data Schemas -> MES Backend -->
+          <g class="edge-group" data-flows="mes">
+            <line x1="1068" y1="274" x2="1068" y2="318" stroke="#fbbf24" stroke-width="1.8" marker-end="url(#arrow-amber)" />
+          </g>
+
+          <!-- MES Backend -> QC Buffer -> CNC/Frontend -->
+          <g class="edge-group" data-flows="mes">
+            <line x1="1068" y1="416" x2="1068" y2="454" stroke="#fb923c" stroke-width="1.8" marker-end="url(#arrow-orange)" />
+            <line x1="1068" y1="538" x2="1068" y2="578" stroke="#22d3ee" stroke-width="1.8" marker-end="url(#arrow-cyan)" />
+          </g>
+
+          <!-- MES Backend -> ERP Write-Back (Target Future Flow) -->
+          <g class="edge-group" data-flows="mes">
+            <path d="M 935 365 L 880 365 L 880 212 L 605 212 L 605 168" fill="none" stroke="#fb923c" stroke-width="1.8" stroke-dasharray="6,4" marker-end="url(#arrow-orange)" />
+            <text x="742" y="204" fill="#fdba74" font-size="8.5" font-weight="700" text-anchor="middle">批次寫回 BOMYZ / BMSLIP+SSLIP (核准後)</text>
+          </g>
+
+          <!-- ==================== LEGEND (STRICTLY OUTSIDE ALL BOUNDARIES) ==================== -->
+          <rect x="20" y="742" width="1200" height="58" rx="8" fill="#0f172a" stroke="#334155" stroke-width="1.2" />
+          <text x="38" y="764" fill="#f8fafc" font-size="10.5" font-weight="700">圖例說明 (LEGEND)</text>
+
+          <rect x="38" y="774" width="14" height="10" rx="2" fill="rgba(8,51,68,0.65)" stroke="#22d3ee" stroke-width="1.5" />
+          <text x="58" y="783" fill="#e2e8f0" font-size="9.5">操作端 / UI / Agent</text>
+
+          <rect x="195" y="774" width="14" height="10" rx="2" fill="rgba(76,29,149,0.55)" stroke="#a78bfa" stroke-width="1.5" />
+          <text x="215" y="783" fill="#e2e8f0" font-size="9.5">MSSQL 資料庫 / XEvents</text>
+
+          <rect x="372" y="774" width="14" height="10" rx="2" fill="rgba(136,19,55,0.6)" stroke="#fb7185" stroke-width="1.5" />
+          <text x="392" y="783" fill="#e2e8f0" font-size="9.5">機械式安全防線</text>
+
+          <rect x="512" y="774" width="14" height="10" rx="2" fill="rgba(6,78,59,0.6)" stroke="#34d399" stroke-width="1.5" />
+          <text x="532" y="783" fill="#e2e8f0" font-size="9.5">Python 鑑識引擎模組</text>
+
+          <rect x="680" y="774" width="14" height="10" rx="2" fill="rgba(251,146,60,0.35)" stroke="#fb923c" stroke-width="1.5" />
+          <text x="700" y="783" fill="#e2e8f0" font-size="9.5">雙軌事件 / QC 緩衝</text>
+
+          <rect x="840" y="774" width="14" height="10" rx="2" fill="rgba(120,53,15,0.45)" stroke="#fbbf24" stroke-width="1.5" />
+          <text x="860" y="783" fill="#e2e8f0" font-size="9.5">知識庫 / 下游 MES</text>
+
+          <line x1="998" y1="779" x2="1030" y2="779" stroke="#fb7185" stroke-width="2" stroke-dasharray="4,3" />
+          <text x="1038" y="783" fill="#fda4af" font-size="9.5">唯讀 / 沙盒隔離路徑</text>
+        </svg>
+
+        <!-- ==================== HTML NODES (WITH RELATIVE <img src>) ==================== -->
+        <!-- Zone 1 Nodes -->
+        <div class="node theme-frontend" style="left: 36px; top: 62px; width: 258px; height: 66px;"
+             data-flows="capture"
+             data-title="操作人員 (Human-in-the-Loop Operator)"
+             data-meta="Stages A–E · 18 Core Actions"
+             data-desc="依照鑑識矩陣（A1–A4 庫存過帳、B5–B8 廠內領退料、C9–C12 廠內移轉組合、D13–D17 加工混合製造、E18 刻意觸發阻擋）在 localhost with ERP 上操作XY ERP 並存檔。">
+          <div class="node-inner">
+            <img class="node-icon" src="aws-svg-icons/Resource-Icons/Resource-Icons_01312024/Res_General-Icons/Res_48_Dark/Res_Authenticated-User_48_Dark.svg" alt="Operator" onerror="this.style.display='none'" />
+            <div class="node-text">
+              <div class="node-title">操作人員 (Operator)</div>
+              <div class="node-sub">Human-in-the-Loop · A1–E18 實測</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="node theme-frontend" style="left: 36px; top: 164px; width: 258px; height: 74px;"
+             data-flows="capture"
+             data-title="localhost with ERP — 凌越最佳拍檔 5.X (XY ERP)"
+             data-meta="Host: localhost with ERP · Logins: LYS, LTSXM"
+             data-desc="地端 Windows 工作站執行的套裝 ERP 桌面端（無原廠 API、無付費驗貨模組，存檔即直接過帳）。XEvents 以 client_hostname='localhost with ERP' 精準過濾此端發出的所有讀寫 SQL。">
+          <div class="node-inner">
+            <img class="node-icon" src="aws-svg-icons/Resource-Icons/Resource-Icons_01312024/Res_General-Icons/Res_48_Dark/Res_Client_48_Dark.svg" alt="localhost with ERP" onerror="this.style.display='none'" />
+            <div class="node-text">
+              <div class="node-title">localhost with ERP (XY ERP 5.X)</div>
+              <div class="node-sub">套裝桌面 UI · 存檔即直接過帳</div>
+              <span class="node-badge">獨立地端軟體</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="node theme-frontend" style="left: 36px; top: 258px; width: 258px; height: 70px;"
+             data-flows="capture offline"
+             data-title="AI Coding Agent & Repo Skills"
+             data-meta=".claude/skills/erp-forensic · erp-sandbox-verify"
+             data-desc="透過 erp-forensic Skill 執行雙階段檢視（預設先看低 Token 消耗的 write_call_tree，遇阻擋或動態公式才離線展開 read_queries），並以 erp-sandbox-verify 驗證沙盒等價性。">
+          <div class="node-inner">
+            <img class="node-icon" src="gcp-svg-icons/Agents/SVG/Agents-512-color.svg" alt="AI Agent" onerror="this.style.display='none'" />
+            <div class="node-text">
+              <div class="node-title">AI Agent (Claude / Gemini)</div>
+              <div class="node-sub">erp-forensic · erp-sandbox-verify</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Zone 2 Nodes -->
+        <div class="node theme-db" style="left: 378px; top: 88px; width: 218px; height: 78px;"
+             data-flows="capture security mes"
+             data-title="正式庫 [XTABLENAME] (Strictly Read-Only)"
+             data-meta="MSSQL 2025 Express (17.0.1155.3)"
+             data-desc="XY ERP 正式資料庫，含 BMSLIP、SSLIP、BOMTZC、BOMYZ、 等核心表與 *_jEXTENDED 擴充觸發器。對 j_forensic 施加 db_dader + DENY INSERT/UPDATE/DELETE/ALTER。">
+          <div class="node-inner">
+            <img class="node-icon" src="aws-svg-icons/Resource-Icons/Resource-Icons_01312024/Res_General-Icons/Res_48_Dark/Res_Database_48_Dark.svg" alt="Prod DB" onerror="this.style.display='none'" />
+            <div class="node-text">
+              <div class="node-title">[XTABLENAME] 正式庫</div>
+              <div class="node-sub">BMSLIP · SSLIP · BOMYZ · </div>
+              <span class="node-badge sec">STRICTLY READ-ONLY</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="node theme-bus" style="left: 378px; top: 236px; width: 218px; height: 78px;"
+             data-flows="capture security"
+             data-title="Extended Events [j_erp_forensic]"
+             data-meta="MAX_DURATION=10m · package0.event_file"
+             data-desc="捕捉 sql_batch_completed、rpc_completed、sp_statement_completed、sql_transaction 與 lock_acquired (OBJECT X/IX/SIX/UIX)，啟用 TRACK_CAUSALITY=ON 與 10 分鐘自動停機安全網，寫入 *.xel。">
+          <div class="node-inner">
+            <img class="node-icon" src="aws-svg-icons/Resource-Icons/Resource-Icons_01312024/Res_General-Icons/Res_48_Dark/Res_Logs_48_Dark.svg" alt="XEvents" onerror="this.style.display='none'" />
+            <div class="node-text">
+              <div class="node-title">Extended Events (*.xel)</div>
+              <div class="node-sub">TRACK_CAUSALITY · 鎖定與交易事件</div>
+              <span class="node-badge">MAX_DURATION 10m</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="node theme-db" style="left: 644px; top: 88px; width: 218px; height: 86px;"
+             data-flows="security offline"
+             data-title="沙盒庫 [XTABLENAME_SANDBOX]"
+             data-meta="db_owner (Sandbox Only) · verify-replay"
+             data-desc="由正式庫 .bak 備份還原的隔離測試庫。僅在此庫允許 j_forensic 執行寫入重播（verify-replay --rollback-only），逐欄比對 XYerp_CORE 異動是否 100% 等價。">
+          <div class="node-inner">
+            <img class="node-icon" src="aws-svg-icons/Resource-Icons/Resource-Icons_01312024/Res_General-Icons/Res_48_Dark/Res_Database_48_Dark.svg" alt="Sandbox DB" onerror="this.style.display='none'" />
+            <div class="node-text">
+              <div class="node-title">[XTABLENAME_SANDBOX]</div>
+              <div class="node-sub">由 .bak 還原 · 等價重播測試庫</div>
+              <span class="node-badge">db_owner 隔離驗證</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Zone 3 Nodes (Forensic CLI Engine) -->
+        <div class="node theme-sec" style="left: 364px; top: 416px; width: 498px; height: 62px;"
+             data-flows="security capture offline"
+             data-title="機械式防寫防線 (guard.py + 00_create_forensic_login.sql)"
+             data-meta="pyodbc · ODBC Driver 18 · Zero-Write Guarantee"
+             data-desc="GuardedProdConnection 強制 READ UNCOMMITTED + LOCK_TIMEOUT 3000 並以正則白名單阻擋所有 DML/DDL 與多語句批次；GuardedSandboxConnection 驗證 DB_NAME() 防止誤連正式庫。">
+          <div class="node-inner">
+            <img class="node-icon" src="aws-svg-icons/Resource-Icons/Resource-Icons_01312024/Res_General-Icons/Res_48_Dark/Res_Shield_48_Dark.svg" alt="Guard" onerror="this.style.display='none'" />
+            <div class="node-text">
+              <div class="node-title">機械式防寫代理 (guard.py · GuardedProd / GuardedSandbox)</div>
+              <div class="node-sub">SQL DENY DML/DDL · 單語句白名單 · READ UNCOMMITTED · LOCK_TIMEOUT 3000 · pyodbc ODBC 18</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Pure Rounded-Rect Independent Python Modules -->
+        <div class="node theme-backend" style="left: 364px; top: 510px; width: 158px; height: 62px;"
+             data-flows="capture"
+             data-title="靜態目錄掃描器 (catalog.py)"
+             data-meta="CLI: inspect-catalog"
+             data-desc="讀取 sys.tables、sys.triggers、sys.objects、sys.sql_modules，區分 XYerp_CORE、j_EXTENDED 與 WITH ENCRYPTION 模組，產出 catalog.json。">
+          <div class="node-inner centered">
+            <div class="node-title">catalog.py</div>
+            <div class="node-sub">靜態結構 / 觸發器掃描</div>
+          </div>
+        </div>
+
+        <div class="node theme-backend" style="left: 534px; top: 510px; width: 158px; height: 62px;"
+             data-flows="capture"
+             data-title="Extended Events 控制器 (xevents.py)"
+             data-meta="CLI: capture start/stop · cleanup"
+             data-desc="自動化建立、啟動、停止與清除 [j_erp_forensic] 工作階段，解析 *.xel XML 並無損封存 100% 原始事件至 raw_events.jsonl。">
+          <div class="node-inner centered">
+            <div class="node-title">xevents.py</div>
+            <div class="node-sub">XE 生命週期與 XML 解析</div>
+          </div>
+        </div>
+
+        <div class="node theme-backend" style="left: 704px; top: 510px; width: 158px; height: 62px;"
+             data-flows="capture offline"
+             data-title="範圍快照比對器 (snapshot.py)"
+             data-meta="WITH (NOLOCK) · REPLACED_DELETE_INSERT"
+             data-desc="擷取前後依 SK_NO/MP_NO/SP_NO 掃描候選與鎖定表，逐欄計算差異並精準辨識同交易內的 DELETE+INSERT 覆寫行為。">
+          <div class="node-inner centered">
+            <div class="node-title">snapshot.py</div>
+            <div class="node-sub">NOLOCK 前後快照差異</div>
+          </div>
+        </div>
+
+        <div class="node theme-backend" style="left: 364px; top: 618px; width: 244px; height: 76px;"
+             data-flows="capture offline"
+             data-title="雙軌關聯器 (correlator.py)"
+             data-meta="sqlglot AST Fingerprint · Dual-Stream"
+             data-desc="套用 60 秒閒置雜訊校準表，將無損事件切分為 Stream 1 (write_call_tree.jsonl 保留交易內 SELECT) 與 Stream 2 (read_queries.jsonl 去重分類 CONFIG_READ / PRE_WRITE_CHECK / POST_WRITE_REFRESH)。">
+          <div class="node-inner">
+            <img class="node-icon" src="aws-svg-icons/Resource-Icons/Resource-Icons_01312024/Res_General-Icons/Res_48_Dark/Res_Magnifying-Glass_48_Dark.svg" alt="Correlator" onerror="this.style.display='none'" />
+            <div class="node-text">
+              <div class="node-title">correlator.py (雙軌關聯)</div>
+              <div class="node-sub">Write Call Tree + Read 去重分類</div>
+              <span class="node-badge">sqlglot AST 指紋</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="node theme-backend" style="left: 638px; top: 618px; width: 224px; height: 76px;"
+             data-flows="offline mes"
+             data-title="SQL 轉譯合成器 (synthesizer.py)"
+             data-meta="sp_executesql Unwrap · SQLAlchemy 2.0"
+             data-desc="拆解 sp_executesql RPC、以 sqlglot 參數化常數、剔除 *_jEXTENDED 擴充觸發器副作用，自動生成原子交易 replay_template.sql 與非同步 replay_fn.py。">
+          <div class="node-inner">
+            <img class="node-icon" src="aws-svg-icons/Resource-Icons/Resource-Icons_01312024/Res_General-Icons/Res_48_Dark/Res_Gear_48_Dark.svg" alt="Synthesizer" onerror="this.style.display='none'" />
+            <div class="node-text">
+              <div class="node-title">synthesizer.py (SQL 合成)</div>
+              <div class="node-sub">剔除 *_jEXTENDED 觸發器</div>
+              <span class="node-badge">SQL / SQLAlchemy 2.0</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Zone 4 Nodes (Local Artifacts) -->
+        <div class="node theme-ext" style="left: 36px; top: 420px; width: 258px; height: 64px;"
+             data-flows="capture offline"
+             data-title="靜態目錄與雜訊校準檔 (forensics/)"
+             data-meta="catalog.json · noise_allowlist.json"
+             data-desc="儲存一次性靜態資料表/觸發器清冊（catalog.json / catalog_summary.md）與 60 秒閒置背景雜訊指紋白名單（noise_allowlist.json）。">
+          <div class="node-inner centered">
+            <div class="node-title">forensics/catalog &amp; allowlist</div>
+            <div class="node-sub">catalog.json · noise_allowlist.json</div>
+          </div>
+        </div>
+
+        <div class="node theme-ext" style="left: 36px; top: 506px; width: 258px; height: 94px;"
+             data-flows="capture offline"
+             data-title="無損工作階段封存 (forensics/sessions/<ID>/)"
+             data-meta="raw_events.jsonl · Dual Streams · Replay"
+             data-desc="每次 capture stop 完整保存 raw_events.jsonl、write_call_tree.jsonl、read_queries.jsonl、row_diffs.json、summary.md、replay_template.sql 與 replay_fn.py（嚴禁提交至 Git）。">
+          <div class="node-inner centered">
+            <div class="node-title">forensics/sessions/&lt;SESSION_ID&gt;/</div>
+            <div class="node-sub">raw_events.jsonl (100% 無損)</div>
+            <div class="node-sub">write_call_tree · read_queries · row_diffs</div>
+            <div class="node-sub">summary.md · replay_template.sql / .py</div>
+          </div>
+        </div>
+
+        <div class="node theme-bus" style="left: 36px; top: 626px; width: 258px; height: 68px;"
+             data-flows="offline"
+             data-title="離線重分析器 (erp-forensic analyze)"
+             data-meta="< 0.1s · Zero SQL Server Connection"
+             data-desc="直接重讀 raw_events.jsonl 進行離線切片（--view write|read|blocked|all、--include-noise），徹底消除為了看 Read 查詢而要求人員重做 ERP 動作的痛點。">
+          <div class="node-inner centered">
+            <div class="node-title">離線重分析 (erp-forensic analyze)</div>
+            <div class="node-sub">&lt;0.1s 重切視角 · 零資料庫連線</div>
+          </div>
+        </div>
+
+        <!-- Zone 5 Nodes (Downstream Ecosystem) -->
+        <div class="node theme-cloud" style="left: 934px; top: 72px; width: 268px; height: 86px;"
+             data-flows="offline mes"
+             data-title="去敏化 ERP 交易食譜庫 (docs/erp-recipes/)"
+             data-meta="GitHub Versioned · Stages A–E + X01–X07"
+             data-desc="存放經確認且去敏化的 ERP 操作食譜（含 B5–B8 廠內製令、C9–C12 廠內組合、D13–D17 加工混合製造、X01–X07 編號/鎖定/阻擋規則與寫前檢核 SQL）。">
+          <div class="node-inner">
+            <img class="node-icon" src="aws-svg-icons/Resource-Icons/Resource-Icons_01312024/Res_General-Icons/Res_48_Dark/Res_Documents_48_Dark.svg" alt="Recipes" onerror="this.style.display='none'" />
+            <div class="node-text">
+              <div class="node-title">docs/erp-recipes/ (GitHub)</div>
+              <div class="node-sub">Stages A–E (18 動作) + X01–X07</div>
+              <span class="node-badge">已去敏化版控範本</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="node theme-cloud" style="left: 934px; top: 198px; width: 268px; height: 76px;"
+             data-flows="mes"
+             data-title="ERP 欄位與公式知識庫 (j-data-schemas)"
+             data-meta="Companion Repo · Knowledge Sink"
+             data-desc="集中維護XY ERP 資料表中文語意（tables_definitions.md / lytable_md/*.md）、庫存可用量公式（@wd_AMT/@wd_AMTOK）與成本演算法。">
+          <div class="node-inner centered">
+            <div class="node-title">j-data-schemas</div>
+            <div class="node-sub">ERP 資料表定義 · 庫存/完工數公式知識庫</div>
+          </div>
+        </div>
+
+        <div class="node theme-cloud" style="left: 934px; top: 320px; width: 268px; height: 96px;"
+             data-flows="mes"
+             data-title="MES 後端消費端 (j-mes / pythonportal)"
+             data-meta="SQLAlchemy 2.0 · Consolidated Batch Write-Back"
+             data-desc="導入轉譯後的 SQLAlchemy 2.0 範本與寫前檢核規則。嚴守批次彙總原則（不對單次 CNC M30 寫單）：非末站寫 BOMYZ 移轉單、末站寫 BMSLIP+SSLIP 組合單（更新 MP_FINNUM 並將報廢導向 Y99 廢料倉）。">
+          <div class="node-inner">
+            <img class="node-icon" src="aws-svg-icons/Resource-Icons/Resource-Icons_01312024/Res_General-Icons/Res_48_Dark/Res_Generic-Application_48_Dark.svg" alt="MES Backend" onerror="this.style.display='none'" />
+            <div class="node-text">
+              <div class="node-title">pythonportal / j-mes</div>
+              <div class="node-sub">MES 後端 · 寫前檢核與批次寫回</div>
+              <span class="node-badge">SQLAlchemy 2.0 消費端</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="node theme-bus" style="left: 934px; top: 456px; width: 268px; height: 82px;"
+             data-flows="mes"
+             data-title="MES 待品檢批緩衝區 (Pending QC Lot)"
+             data-meta="IPQC / FQC Gate · 彌補無付費驗貨模組"
+             data-desc="因未購買凌越驗貨模組且 ERP 存檔即過帳，由 MES 接管中間態：免檢站直接批次寫入 ERP；需品檢站（IPQC/FQC）先暫存 Pending QC Lot，待品檢填寫合格數與報廢數後再寫入 ERP。">
+          <div class="node-inner centered">
+            <div class="node-title">MES 待品檢批 (Pending QC Lot)</div>
+            <div class="node-sub">免檢站直寫 / 需品檢站 IPQC·FQC 把關</div>
+            <span class="node-badge">中間緩衝閘門</span>
+          </div>
+        </div>
+
+        <div class="node theme-ext" style="left: 934px; top: 580px; width: 268px; height: 112px;"
+             data-flows="mes"
+             data-title="現場機台聯網與前端介面"
+             data-meta="staffportal-frontend · FANUC CNC · 委外加工"
+             data-desc="staffportal-frontend 提供現場與品檢操作介面；即時輪詢 FANUC CNC 控制器 M30 完工計數寫入 MES_* 資料表，並串接廠內工作站 (AD_PFG=0) 與委外加工戶 (AD_PFG=1) 混合製程。">
+          <div class="node-inner centered">
+            <div class="node-title">現場機台聯網與 MES 前端</div>
+            <div class="node-sub">staffportal-frontend (Web UI)</div>
+            <div class="node-sub">FANUC CNC (M30 即時輪詢 → MES_*)</div>
+            <div class="node-sub">混合製程：廠內 CNC (0) + 委外加工 (1)</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Interactive Detail Inspector -->
+    <div class="inspector" id="inspector">
+      <div>
+        <div class="inspector-title" id="inspector-title">💡 點擊上方架構圖中的任意元件以檢視詳細技術規格</div>
+        <div class="inspector-desc" id="inspector-desc">
+          支援互動式節點檢視與上方視角篩選（全部架構 / 雙軌即時擷取 / 機械式防寫防線 / 離線分析與轉譯 / MES 與 CNC 整合應用）。右上角「⋯」按鈕可一鍵複製圖片或匯出高解析 PNG / PDF。
+        </div>
+      </div>
+      <div class="inspector-meta" id="inspector-meta">Interactive Mode</div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="cards-grid">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-dot" style="background: var(--c-sec);"></div>
+          <h3>雙層機械式防寫保護</h3>
+        </div>
+        <ul>
+          <li>• <strong>資料庫層</strong>：專屬帳號 <code>j_forensic</code> 非 sysadmin，正式庫 <code>[XTABLENAME]</code> 強制 <code>DENY INSERT/UPDATE/DELETE/ALTER</code>。</li>
+          <li>• <strong>應用層</strong>：<code>guard.py</code> 強制 <code>READ UNCOMMITTED</code>、單語句白名單與 <code>MAX_DURATION=10m</code> 自動停機。</li>
+          <li>• <strong>沙盒隔離</strong>：寫入等價測試僅限 <code>[XTABLENAME_SANDBOX]</code> 並搭配 <code>--rollback-only</code>。</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-dot" style="background: var(--c-backend);"></div>
+          <h3>無損雙軌擷取與離線分析</h3>
+        </div>
+        <ul>
+          <li>• <strong>無損封存</strong>：每次擷取完整保留 100% 原始事件於 <code>raw_events.jsonl</code>，不遺漏任何讀取或阻擋行為。</li>
+          <li>• <strong>寫讀分流</strong>：預設檢視低雜訊 <code>write_call_tree.jsonl</code>，遇阻擋 (E18) 或公式時再展開去重後的 <code>read_queries.jsonl</code>。</li>
+          <li>• <strong>零重測成本</strong>：<code>erp-forensic analyze</code> 於 &lt;0.1 秒離線重切視角，不需重連資料庫。</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-dot" style="background: var(--c-cloud);"></div>
+          <h3>ERP → MES → CNC 串接藍圖</h3>
+        </div>
+        <ul>
+          <li>• <strong>兩層製令模型</strong>：加工製令 <code>'9'</code>（CNC＋委外混合製造）與廠內製令 <code>'5'</code>（純廠內組裝）。</li>
+          <li>• <strong>品檢緩衝閘門</strong>：MES 持有 <code>Pending QC Lot</code>，彌補未購置原廠驗貨模組與存檔即過帳風險。</li>
+          <li>• <strong>批次寫回</strong>：中站寫 <code>BOMYZ</code> 移轉單、末站寫 <code>BMSLIP+SSLIP</code> 組合單，不逐筆 <code>M30</code> 寫單。</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <span>j Precision Machinery Co., Ltd. · jp/j-db-forensic</span>
+      <span>Icons: relative paths from Google Drive architecture_icons · Pure On-Premises Architecture</span>
+    </div>
+  </div>
+
+  <script>
+    // Interactive Node Selection
+    const nodes = document.querySelectorAll('.node');
+    const edges = document.querySelectorAll('.edge-group');
+    const inspTitle = document.getElementById('inspector-title');
+    const inspDesc = document.getElementById('inspector-desc');
+    const inspMeta = document.getElementById('inspector-meta');
+
+    nodes.forEach(node => {
+      node.addEventListener('click', () => {
+        nodes.forEach(n => n.classList.remove('selected'));
+        node.classList.add('selected');
+        inspTitle.textContent = node.dataset.title || '';
+        inspDesc.textContent = node.dataset.desc || '';
+        inspMeta.textContent = node.dataset.meta || '';
+      });
+    });
+
+    // Interactive Flow Filter
+    function setFilter(flow, btn) {
+      document.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+
+      nodes.forEach(node => {
+        if (flow === 'all') {
+          node.classList.remove('dimmed');
+        } else {
+          const list = (node.dataset.flows || '').split(' ');
+          node.classList.toggle('dimmed', !list.includes(flow));
+        }
+      });
+
+      edges.forEach(edge => {
+        if (flow === 'all') {
+          edge.classList.remove('dimmed');
+        } else {
+          const list = (edge.dataset.flows || '').split(' ');
+          edge.classList.toggle('dimmed', !list.includes(flow));
+        }
+      });
+    }
+
+    // Export Toolbar Logic (architecture-diagram skill built-in)
+    function toggleToolbar() {
+      document.getElementById('export-toolbar').classList.toggle('open');
+    }
+
+    async function captureCanvas() {
+      const el = document.getElementById('report-container');
+      const rect = el.getBoundingClientRect();
+      const pad = 32;
+      return html2canvas(document.body, {
+        backgroundColor: '#020617',
+        scale: 2,
+        useCORS: true,
+        x: Math.max(0, rect.left + window.scrollX - pad),
+        y: Math.max(0, rect.top + window.scrollY - pad),
+        width: rect.width + pad * 2,
+        height: rect.height + pad * 2,
+        ignoreElements: (node) => node.classList && (node.classList.contains('toolbar') || node.classList.contains('filter-bar'))
+      });
+    }
+
+    async function copyAsImage() {
+      try {
+        const canvas = await captureCanvas();
+        canvas.toBlob(async (blob) => {
+          await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+          alert('已將高解析架構圖複製到剪貼簿！');
+        });
+      } catch (err) {
+        alert('複製失敗（請確認於 https/localhost 環境執行）：' + err.message);
+      }
+    }
+
+    async function downloadPNG() {
+      const canvas = await captureCanvas();
+      const link = document.createElement('a');
+      link.download = 'j-db-forensic-architecture.png';
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    }
+
+    async function downloadPDF() {
+      const canvas = await captureCanvas();
+      const imgData = canvas.toDataURL('image/png');
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF({
+        orientation: canvas.width > canvas.height ? 'landscape' : 'portrait',
+        unit: 'px',
+        format: [canvas.width / 2, canvas.height / 2]
+      });
+      pdf.addImage(imgData, 'PNG', 0, 0, canvas.width / 2, canvas.height / 2);
+      pdf.save('j-db-forensic-architecture.pdf');
+    }
+  </script>
+</body>
+</html>

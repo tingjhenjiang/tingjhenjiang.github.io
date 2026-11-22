@@ -1,0 +1,1340 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>j Workload Identity Federation — 全域架構圖</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js" integrity="sha384-ZZ1pncU3bQe8y31yfZdMFdSpttDoPmOZg2wguVK9almUodir1PghgT0eY7Mrty8H" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js" integrity="sha384-en/ztfPSRkGfME4KIm05joYXynqzUgbsG5nMrj/xEFAHXkeZfO3yMK8QQ+mP7p1/" crossorigin="anonymous"></script>
+  <style>
+    :root {
+      --bg-canvas: #020617;
+      --bg-card: #0f172a;
+      --bg-node: #0b1224;
+      --border-subtle: #334155;
+      --text-primary: #ffffff;
+      --text-secondary: #e2e8f0;
+      --text-muted: #cbd5e1;
+
+      --cyan: #22d3ee;
+      --cyan-bg: rgba(8, 51, 68, 0.55);
+      --emerald: #34d399;
+      --emerald-bg: rgba(6, 78, 59, 0.55);
+      --violet: #c084fc;
+      --violet-bg: rgba(76, 29, 149, 0.50);
+      --amber: #fbbf24;
+      --amber-bg: rgba(120, 53, 15, 0.42);
+      --rose: #fb7185;
+      --rose-bg: rgba(136, 19, 55, 0.55);
+      --orange: #fb923c;
+      --orange-bg: rgba(154, 52, 18, 0.45);
+      --slate: #cbd5e1;
+      --slate-bg: rgba(30, 41, 59, 0.72);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: var(--bg-canvas);
+      color: var(--text-primary);
+      font-family: 'JetBrains Mono', 'Noto Sans TC', monospace, sans-serif;
+      min-height: 100vh;
+      padding: 24px;
+      line-height: 1.5;
+    }
+
+    .container {
+      max-width: 1480px;
+      margin: 0 auto;
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+      margin-bottom: 18px;
+      flex-wrap: wrap;
+    }
+
+    .title-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .title-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .pulse-dot {
+      width: 11px;
+      height: 11px;
+      border-radius: 50%;
+      background: var(--emerald);
+      box-shadow: 0 0 12px var(--emerald);
+      animation: pulse 2s infinite;
+      flex-shrink: 0;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.45; transform: scale(1.22); }
+    }
+
+    h1 {
+      font-size: 20px;
+      font-weight: 700;
+      color: #ffffff;
+      letter-spacing: -0.02em;
+    }
+
+    .subtitle {
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    /* Export Toolbar */
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .toolbar-actions {
+      display: none;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .toolbar.open .toolbar-actions {
+      display: flex;
+    }
+
+    .toolbar-btn, .toolbar-toggle {
+      background: #1e293b;
+      color: #f8fafc;
+      border: 1px solid #475569;
+      border-radius: 8px;
+      padding: 7px 12px;
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .toolbar-btn:hover, .toolbar-toggle:hover {
+      background: #334155;
+      border-color: var(--cyan);
+      color: #ffffff;
+    }
+
+    /* Filter Bar */
+    .filter-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 14px;
+      padding: 10px 14px;
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 10px;
+    }
+
+    .filter-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .filter-pill {
+      background: #1e293b;
+      color: #e2e8f0;
+      border: 1px solid #475569;
+      border-radius: 999px;
+      padding: 5px 12px;
+      font-family: inherit;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .filter-pill:hover {
+      border-color: var(--cyan);
+      color: #ffffff;
+    }
+
+    .filter-pill.active {
+      background: rgba(34, 211, 238, 0.2);
+      border-color: var(--cyan);
+      color: #ffffff;
+      box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.35);
+    }
+
+    .filter-hint {
+      font-size: 11px;
+      color: var(--amber);
+      font-weight: 500;
+    }
+
+    /* Diagram Card */
+    .diagram-card {
+      background: var(--bg-canvas);
+      border: 1.5px solid #334155;
+      border-radius: 14px;
+      padding: 14px;
+      overflow-x: auto;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55);
+    }
+
+    /* Fixed Coordinate Stage (1440 x 940) */
+    .stage {
+      position: relative;
+      width: 1440px;
+      height: 940px;
+      margin: 0 auto;
+      background: var(--bg-canvas);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    .stage-svg {
+      position: absolute;
+      inset: 0;
+      width: 1440px;
+      height: 940px;
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    .stage-nodes {
+      position: absolute;
+      inset: 0;
+      z-index: 2;
+    }
+
+    /* Interactive Nodes */
+    .node {
+      position: absolute;
+      border-radius: 8px;
+      border-width: 1.75px;
+      border-style: solid;
+      padding: 8px 10px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+      transition: transform 0.16s ease, box-shadow 0.16s ease, opacity 0.2s ease;
+      background-color: #0b1224;
+      user-select: none;
+    }
+
+    .node:hover {
+      transform: translateY(-2px);
+      z-index: 10;
+    }
+
+    .node.selected {
+      box-shadow: 0 0 0 2.5px #ffffff, 0 0 22px rgba(34, 211, 238, 0.65);
+      z-index: 11;
+    }
+
+    .node.dimmed {
+      opacity: 0.22;
+    }
+
+    /* Semantic Node Styles (High Contrast) */
+    .node-control {
+      background: linear-gradient(135deg, #0b1224 0%, rgba(8, 51, 68, 0.78) 100%);
+      border-color: var(--cyan);
+    }
+    .node-control:hover { box-shadow: 0 0 18px rgba(34, 211, 238, 0.45); }
+
+    .node-onprem {
+      background: linear-gradient(135deg, #0b1224 0%, rgba(6, 78, 59, 0.78) 100%);
+      border-color: var(--emerald);
+    }
+    .node-onprem:hover { box-shadow: 0 0 18px rgba(52, 211, 153, 0.45); }
+
+    .node-security {
+      background: linear-gradient(135deg, #0b1224 0%, rgba(136, 19, 55, 0.78) 100%);
+      border-color: var(--rose);
+    }
+    .node-security:hover { box-shadow: 0 0 18px rgba(251, 113, 133, 0.45); }
+
+    .node-gcp {
+      background: linear-gradient(135deg, #0b1224 0%, rgba(120, 53, 15, 0.62) 100%);
+      border-color: var(--amber);
+    }
+    .node-gcp:hover { box-shadow: 0 0 18px rgba(251, 191, 36, 0.45); }
+
+    .node-storage {
+      background: linear-gradient(135deg, #0b1224 0%, rgba(76, 29, 149, 0.72) 100%);
+      border-color: var(--violet);
+    }
+    .node-storage:hover { box-shadow: 0 0 18px rgba(192, 132, 252, 0.45); }
+
+    .node-aws {
+      background: linear-gradient(135deg, #0b1224 0%, rgba(154, 52, 18, 0.68) 100%);
+      border-color: var(--orange);
+    }
+    .node-aws:hover { box-shadow: 0 0 18px rgba(251, 146, 60, 0.45); }
+
+    .node-external {
+      background: linear-gradient(135deg, #0b1224 0%, rgba(30, 41, 59, 0.92) 100%);
+      border-color: #cbd5e1;
+    }
+    .node-external:hover { box-shadow: 0 0 18px rgba(203, 213, 225, 0.4); }
+
+    /* Non-Cloud Box Centering */
+    .node-box-only {
+      flex-direction: column;
+      justify-content: center;
+      align-items: flex-start;
+      gap: 2px;
+      padding: 8px 12px;
+    }
+
+    /* Cloud Icon Wrapper */
+    .icon-wrap {
+      width: 38px;
+      height: 38px;
+      border-radius: 7px;
+      background: rgba(255, 255, 255, 0.95);
+      padding: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+    }
+
+    .icon-wrap img {
+      width: 30px;
+      height: 30px;
+      object-fit: contain;
+      display: block;
+    }
+
+    .icon-fallback {
+      font-size: 10px;
+      font-weight: 700;
+      color: #0f172a;
+      text-align: center;
+    }
+
+    .node-text {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      gap: 2px;
+    }
+
+    .node-title {
+      font-size: 11.5px;
+      font-weight: 700;
+      color: #ffffff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .node-sub {
+      font-size: 9.5px;
+      color: #e2e8f0;
+      line-height: 1.3;
+    }
+
+    .node-badge {
+      display: inline-block;
+      margin-top: 2px;
+      font-size: 8.5px;
+      font-weight: 700;
+      padding: 1px 6px;
+      border-radius: 4px;
+      width: fit-content;
+    }
+
+    .badge-rose { background: rgba(251, 113, 133, 0.25); color: #fecdd3; border: 1px solid rgba(251, 113, 133, 0.6); }
+    .badge-cyan { background: rgba(34, 211, 238, 0.22); color: #cffafe; border: 1px solid rgba(34, 211, 238, 0.55); }
+    .badge-emerald { background: rgba(52, 211, 153, 0.22); color: #d1fae5; border: 1px solid rgba(52, 211, 153, 0.55); }
+    .badge-amber { background: rgba(251, 191, 36, 0.22); color: #fef3c7; border: 1px solid rgba(251, 191, 36, 0.6); }
+    .badge-violet { background: rgba(192, 132, 252, 0.25); color: #f3e8ff; border: 1px solid rgba(192, 132, 252, 0.6); }
+    .badge-orange { background: rgba(251, 146, 60, 0.25); color: #ffedd5; border: 1px solid rgba(251, 146, 60, 0.6); }
+
+    /* SVG Flow dimming */
+    .flow-edge {
+      transition: opacity 0.2s ease;
+    }
+    .flow-edge.dimmed {
+      opacity: 0.12;
+    }
+
+    /* Legend Outside All Boundaries */
+    .legend-bar {
+      margin-top: 14px;
+      padding: 12px 16px;
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 18px;
+      font-size: 11px;
+      color: #f1f5f9;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 500;
+    }
+
+    .legend-swatch {
+      width: 14px;
+      height: 14px;
+      border-radius: 4px;
+      border-width: 1.5px;
+      border-style: solid;
+    }
+
+    .legend-line {
+      width: 26px;
+      height: 0;
+      border-top-width: 2px;
+    }
+
+    /* Interactive Inspector Panel */
+    .inspector {
+      margin-top: 14px;
+      padding: 14px 18px;
+      background: #0f172a;
+      border: 1.5px solid var(--cyan);
+      border-radius: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .inspector-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .inspector-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--cyan);
+    }
+
+    .inspector-tag {
+      font-size: 10px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: #1e293b;
+      color: #f8fafc;
+      border: 1px solid #475569;
+    }
+
+    .inspector-body {
+      font-size: 12px;
+      color: #f1f5f9;
+    }
+
+    .inspector-meta {
+      font-size: 11px;
+      color: #cbd5e1;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      margin-top: 2px;
+    }
+
+    .inspector-meta code {
+      color: #fde68a;
+      background: #1e293b;
+      padding: 1px 6px;
+      border-radius: 4px;
+    }
+
+    /* Summary Cards (3-column grid per skill) */
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+      margin-top: 16px;
+    }
+
+    @media (max-width: 1024px) {
+      .cards-grid { grid-template-columns: 1fr; }
+    }
+
+    .card {
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      padding: 16px;
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .card-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+
+    .card h3 {
+      font-size: 13px;
+      font-weight: 700;
+      color: #ffffff;
+    }
+
+    .card ul {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 11.5px;
+      color: #e2e8f0;
+    }
+
+    .card li strong {
+      color: #ffffff;
+    }
+
+    /* Footer */
+    .footer {
+      margin-top: 16px;
+      padding-top: 12px;
+      border-top: 1px solid #1e293b;
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 8px;
+      font-size: 10.5px;
+      color: #94a3b8;
+    }
+
+    @media print {
+      .toolbar, .filter-bar { display: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <div id="report-container" class="container">
+    <!-- Header -->
+    <div class="header">
+      <div class="title-group">
+        <div class="title-row">
+          <div class="pulse-dot"></div>
+          <h1>j Workload Identity Federation — 全域系統架構圖</h1>
+        </div>
+        <div class="subtitle">
+          涵蓋 it-maintenance-scripts (Ansible / Terraform / Private PKI / On-Prem X.509 WIF) 與衍生專案 j-serverless-mailservice (跨專案授權 + AWS→GCP WIF)
+        </div>
+      </div>
+
+      <div class="toolbar" id="toolbar">
+        <div class="toolbar-actions">
+          <button class="toolbar-btn" onclick="copyAsImage()">📋 Copy</button>
+          <button class="toolbar-btn" onclick="downloadPNG()">🖼️ PNG</button>
+          <button class="toolbar-btn" onclick="downloadPDF()">📄 PDF</button>
+        </div>
+        <button class="toolbar-toggle" onclick="document.getElementById('toolbar').classList.toggle('open')" title="匯出選項">⋯</button>
+      </div>
+    </div>
+
+    <!-- Interactive Filter Bar -->
+    <div class="filter-bar">
+      <div class="filter-pills">
+        <button class="filter-pill active" data-filter="all">全部圖層 (All)</button>
+        <button class="filter-pill" data-filter="ops">1. 維運控制平面 (Ansible / Terraform)</button>
+        <button class="filter-pill" data-filter="pki">2. 雙層私有 CA 與憑證簽發流</button>
+        <button class="filter-pill" data-filter="x509">3. 地端 X.509 WIF 存取流</button>
+        <button class="filter-pill" data-filter="aws-wif">4. 衍生跨雲 AWS→GCP WIF</button>
+      </div>
+      <div class="filter-hint">💡 點擊任意元件可檢視路徑、Principal 與安全規格</div>
+    </div>
+
+    <!-- Main Diagram Card -->
+    <div class="diagram-card">
+      <div class="stage" id="diagram-stage">
+        <!-- Inline SVG: Grid, Region/Zone Boundaries, and Connection Arrows -->
+        <svg class="stage-svg" viewBox="0 0 1440 940" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+              <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" stroke-width="0.7" />
+            </pattern>
+            <marker id="arrow-cyan" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+              <polygon points="0 0, 10 3.5, 0 7" fill="#22d3ee" />
+            </marker>
+            <marker id="arrow-rose" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+              <polygon points="0 0, 10 3.5, 0 7" fill="#fb7185" />
+            </marker>
+            <marker id="arrow-emerald" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+              <polygon points="0 0, 10 3.5, 0 7" fill="#34d399" />
+            </marker>
+            <marker id="arrow-amber" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+              <polygon points="0 0, 10 3.5, 0 7" fill="#fbbf24" />
+            </marker>
+            <marker id="arrow-orange" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+              <polygon points="0 0, 10 3.5, 0 7" fill="#fb923c" />
+            </marker>
+            <marker id="arrow-violet" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+              <polygon points="0 0, 10 3.5, 0 7" fill="#c084fc" />
+            </marker>
+          </defs>
+
+          <!-- Background Grid -->
+          <rect width="1440" height="940" fill="url(#grid)" />
+
+          <!-- ==================== ZONE BOUNDARIES ==================== -->
+
+          <!-- Zone 1: WSL Controller -->
+          <rect x="20" y="20" width="420" height="235" rx="12" fill="rgba(8, 51, 68, 0.16)" stroke="#22d3ee" stroke-width="1.5" stroke-dasharray="8,4" />
+          <text x="36" y="42" fill="#22d3ee" font-size="11" font-weight="700">WSL CONTROLLER — 控制平面與離線 Root CA (非雲端)</text>
+
+          <!-- Zone 2: Synology NAS -->
+          <rect x="20" y="280" width="420" height="385" rx="12" fill="rgba(6, 78, 59, 0.16)" stroke="#34d399" stroke-width="1.5" stroke-dasharray="8,4" />
+          <text x="36" y="302" fill="#34d399" font-size="11" font-weight="700">SYNOLOGY NAS — 私有 Intermediate CA 與容器工作負載 (非雲端)</text>
+
+          <!-- Zone 3: Windows ERP Computer -->
+          <rect x="20" y="690" width="420" height="230" rx="12" fill="rgba(6, 78, 59, 0.14)" stroke="#34d399" stroke-width="1.5" stroke-dasharray="8,4" />
+          <text x="36" y="712" fill="#34d399" font-size="11" font-weight="700">WINDOWS ERP COMPUTER — STAFF\erp 無金鑰工作負載 (非雲端)</text>
+
+          <!-- Zone 4: GCP Shared VPC Host Project -->
+          <rect x="495" y="20" width="470" height="430" rx="12" fill="rgba(120, 53, 15, 0.14)" stroke="#fbbf24" stroke-width="1.5" stroke-dasharray="8,4" />
+          <text x="512" y="42" fill="#fbbf24" font-size="11" font-weight="700">GCP HOST PROJECT: j-shared-vpc-host (#119)</text>
+
+          <!-- Zone 5: GCP Cross-Project & External -->
+          <rect x="1000" y="20" width="420" height="430" rx="12" fill="rgba(120, 53, 15, 0.10)" stroke="#fbbf24" stroke-width="1.5" stroke-dasharray="8,4" />
+          <text x="1016" y="42" fill="#fbbf24" font-size="11" font-weight="700">GCP 跨專案資源 (Cross-Project) &amp; 外部整合</text>
+
+          <!-- Zone 6: Derived Project j-serverless-mailservice -->
+          <rect x="495" y="485" width="925" height="435" rx="12" fill="rgba(136, 19, 55, 0.10)" stroke="#fb7185" stroke-width="1.5" stroke-dasharray="8,4" />
+          <text x="512" y="507" fill="#fb7185" font-size="11" font-weight="700">衍生 WIF 專案: j-serverless-mailservice (跨專案 Secret 存取 + AWS→GCP 跨雲 WIF)</text>
+
+          <!-- Sub-zone 6A: AWS Account -->
+          <rect x="515" y="525" width="320" height="375" rx="10" fill="rgba(154, 52, 18, 0.15)" stroke="#fb923c" stroke-width="1.25" stroke-dasharray="5,4" />
+          <text x="530" y="545" fill="#fb923c" font-size="10.5" font-weight="700">AWS ACCOUNT (Mail Drain Pipeline)</text>
+
+          <!-- Sub-zone 6B: GCP Mailservice Project -->
+          <rect x="860" y="525" width="540" height="375" rx="10" fill="rgba(120, 53, 15, 0.14)" stroke="#fbbf24" stroke-width="1.25" stroke-dasharray="5,4" />
+          <text x="875" y="545" fill="#fbbf24" font-size="10.5" font-weight="700">GCP PROJECT: j-serverless-mailservice</text>
+
+          <!-- ==================== CONNECTION ARROWS ==================== -->
+
+          <!-- 1. OPS: WSL Ansible -> NAS (SSH) -->
+          <g class="flow-edge" data-flows="ops">
+            <path d="M 110 238 L 110 315" fill="none" stroke="#22d3ee" stroke-width="2" marker-end="url(#arrow-cyan)" />
+            <rect x="46" y="258" width="128" height="18" rx="4" fill="#020617" stroke="#22d3ee" stroke-width="1" />
+            <text x="110" y="270" fill="#cffafe" font-size="9" font-weight="600" text-anchor="middle">SSH (py3.14) 部署/檢查</text>
+          </g>
+
+          <!-- 2. OPS: WSL Ansible -> ERP (WinRM) -->
+          <g class="flow-edge" data-flows="ops">
+            <path d="M 38 145 L 8 145 L 8 765 L 36 765" fill="none" stroke="#22d3ee" stroke-width="2" stroke-dasharray="5,3" marker-end="url(#arrow-cyan)" />
+            <rect x="2" y="455" width="60" height="18" rx="4" fill="#020617" stroke="#22d3ee" stroke-width="1" />
+            <text x="32" y="467" fill="#cffafe" font-size="8.5" font-weight="700" text-anchor="middle">WinRM</text>
+          </g>
+
+          <!-- 3. OPS: WSL Terraform -> GCP WIF Pool -->
+          <g class="flow-edge" data-flows="ops">
+            <path d="M 424 195 L 515 195 L 515 118 L 520 118" fill="none" stroke="#22d3ee" stroke-width="2" marker-end="url(#arrow-cyan)" />
+            <rect x="428" y="168" width="84" height="18" rx="4" fill="#020617" stroke="#22d3ee" stroke-width="1" />
+            <text x="470" y="180" fill="#cffafe" font-size="8.5" font-weight="700" text-anchor="middle">TF Plan/Apply</text>
+          </g>
+
+          <!-- 4. PKI: WSL Offline Root CA -> NAS Intermediate CA (Sign CSR) -->
+          <g class="flow-edge" data-flows="pki">
+            <path d="M 330 135 L 330 315" fill="none" stroke="#fb7185" stroke-width="2.2" stroke-dasharray="6,3" marker-end="url(#arrow-rose)" />
+            <rect x="252" y="258" width="156" height="18" rx="4" fill="#020617" stroke="#fb7185" stroke-width="1" />
+            <text x="330" y="270" fill="#fecdd3" font-size="9" font-weight="600" text-anchor="middle">離線簽發 Intermediate (1095d)</text>
+          </g>
+
+          <!-- 5. PKI: NAS Sign Task -> NAS Workloads -->
+          <g class="flow-edge" data-flows="pki">
+            <path d="M 135 452 L 135 488" fill="none" stroke="#fb7185" stroke-width="1.8" stroke-dasharray="4,3" marker-end="url(#arrow-rose)" />
+            <path d="M 305 452 L 305 488" fill="none" stroke="#fb7185" stroke-width="1.8" stroke-dasharray="4,3" marker-end="url(#arrow-rose)" />
+          </g>
+
+          <!-- 6. PKI: ERP CSR <-> NAS SMB Exchange -->
+          <g class="flow-edge" data-flows="pki">
+            <path d="M 225 725 L 225 654" fill="none" stroke="#fb7185" stroke-width="2.2" stroke-dasharray="5,3" marker-end="url(#arrow-rose)" />
+            <rect x="148" y="668" width="154" height="18" rx="4" fill="#020617" stroke="#fb7185" stroke-width="1" />
+            <text x="225" y="680" fill="#fecdd3" font-size="9" font-weight="600" text-anchor="middle">SMB CSR 投遞 / 30d 憑證取回</text>
+          </g>
+
+          <!-- 7. X509 WIF: NAS Workloads -> GCP STS mTLS / WIF Pool -->
+          <g class="flow-edge" data-flows="x509">
+            <path d="M 424 525 L 470 525 L 470 118 L 520 118" fill="none" stroke="#34d399" stroke-width="2.2" marker-end="url(#arrow-emerald)" />
+            <rect x="424" y="340" width="90" height="30" rx="5" fill="#020617" stroke="#34d399" stroke-width="1" />
+            <text x="469" y="353" fill="#d1fae5" font-size="8.5" font-weight="700" text-anchor="middle">mTLS X.509</text>
+            <text x="469" y="364" fill="#a7f3d0" font-size="8" text-anchor="middle">STS Token</text>
+          </g>
+
+          <!-- 8. X509 WIF: ERP Workloads -> GCP STS mTLS / WIF Pool -->
+          <g class="flow-edge" data-flows="x509">
+            <path d="M 424 810 L 470 810 L 470 525" fill="none" stroke="#34d399" stroke-width="2.2" />
+            <rect x="424" y="742" width="90" height="30" rx="5" fill="#020617" stroke="#34d399" stroke-width="1" />
+            <text x="469" y="755" fill="#d1fae5" font-size="8.5" font-weight="700" text-anchor="middle">mTLS X.509</text>
+            <text x="469" y="766" fill="#a7f3d0" font-size="8" text-anchor="middle">ERP Principals</text>
+          </g>
+
+          <!-- 9. X509 WIF: WIF Pool -> Host Resources (Firewall, Secret, GCS) -->
+          <g class="flow-edge" data-flows="x509">
+            <path d="M 730 164 L 730 202" fill="none" stroke="#fbbf24" stroke-width="2" marker-end="url(#arrow-amber)" />
+            <path d="M 620 164 L 620 185 L 620 202" fill="none" stroke="#fbbf24" stroke-width="1.8" marker-end="url(#arrow-amber)" />
+            <path d="M 730 278 L 730 342" fill="none" stroke="#c084fc" stroke-width="2" marker-end="url(#arrow-violet)" />
+            <rect x="652" y="174" width="156" height="18" rx="4" fill="#020617" stroke="#fbbf24" stroke-width="1" />
+            <text x="730" y="186" fill="#fef3c7" font-size="8.5" font-weight="700" text-anchor="middle">Direct Principal Grants (無 SA)</text>
+          </g>
+
+          <!-- 10. X509 WIF: WIF Pool -> Cross-Project Artifact Registry -->
+          <g class="flow-edge" data-flows="x509">
+            <path d="M 942 118 L 1018 118" fill="none" stroke="#fbbf24" stroke-width="2.2" marker-end="url(#arrow-amber)" />
+            <rect x="945" y="94" width="70" height="18" rx="4" fill="#020617" stroke="#fbbf24" stroke-width="1" />
+            <text x="980" y="106" fill="#fef3c7" font-size="8" font-weight="700" text-anchor="middle">AR Reader</text>
+          </g>
+
+          <!-- 11. X509 WIF: Secret Manager / ERP DNS Script -> Cloudflare WAF -->
+          <g class="flow-edge" data-flows="x509">
+            <path d="M 942 242 L 1018 355" fill="none" stroke="#cbd5e1" stroke-width="2" stroke-dasharray="5,3" marker-end="url(#arrow-amber)" />
+            <rect x="946" y="286" width="84" height="18" rx="4" fill="#020617" stroke="#cbd5e1" stroke-width="1" />
+            <text x="988" y="298" fill="#f1f5f9" font-size="8" font-weight="700" text-anchor="middle">API Token / WAF</text>
+          </g>
+
+          <!-- 12. X509 WIF (Cross-Project): j-onprem erp-dns-firewall -> Mailservice Secret Manager -->
+          <g class="flow-edge" data-flows="x509 aws-wif">
+            <path d="M 900 164 L 900 468 L 1265 468 L 1265 566" fill="none" stroke="#fb7185" stroke-width="2.2" stroke-dasharray="6,3" marker-end="url(#arrow-rose)" />
+            <rect x="965" y="458" width="248" height="19" rx="4" fill="#020617" stroke="#fb7185" stroke-width="1" />
+            <text x="1089" y="471" fill="#fecdd3" font-size="8.5" font-weight="700" text-anchor="middle">跨專案 secretAccessor (erp-dns-firewall principal)</text>
+          </g>
+
+          <!-- 13. AWS->GCP WIF: AWS Batch -> Fargate -> IAM Role -->
+          <g class="flow-edge" data-flows="aws-wif">
+            <path d="M 675 636 L 675 672" fill="none" stroke="#fb923c" stroke-width="2" marker-end="url(#arrow-orange)" />
+            <path d="M 675 748 L 675 784" fill="none" stroke="#fb923c" stroke-width="2" marker-end="url(#arrow-orange)" />
+          </g>
+
+          <!-- 14. AWS->GCP WIF: AWS IAM Role -> GCP mailservice-aws-pool -->
+          <g class="flow-edge" data-flows="aws-wif">
+            <path d="M 815 826 L 848 826 L 848 608 L 878 608" fill="none" stroke="#fb923c" stroke-width="2.4" marker-end="url(#arrow-orange)" />
+            <rect x="780" y="704" width="128" height="30" rx="5" fill="#020617" stroke="#fb923c" stroke-width="1" />
+            <text x="844" y="717" fill="#ffedd5" font-size="8.5" font-weight="700" text-anchor="middle">Signed GetCallerIdentity</text>
+            <text x="844" y="728" fill="#fed7aa" font-size="8" text-anchor="middle">GCP STS Token Exchange</text>
+          </g>
+
+          <!-- 15. AWS->GCP WIF: mailservice-aws-pool -> Ingest Bucket & Firestore -->
+          <g class="flow-edge" data-flows="aws-wif">
+            <path d="M 1005 654 L 1005 702" fill="none" stroke="#c084fc" stroke-width="2" marker-end="url(#arrow-violet)" />
+            <path d="M 1005 782 L 1005 812" fill="none" stroke="#c084fc" stroke-width="1.8" marker-end="url(#arrow-violet)" />
+            <path d="M 1265 654 L 1265 702" fill="none" stroke="#fbbf24" stroke-width="1.8" stroke-dasharray="4,3" marker-end="url(#arrow-amber)" />
+          </g>
+        </svg>
+
+        <!-- HTML Overlay Layer: Nodes with <img src="..."> for AWS/GCP & Rounded Boxes for Non-Cloud -->
+        <div class="stage-nodes">
+          <!-- ==================== ZONE 1: WSL CONTROLLER (NON-CLOUD) ==================== -->
+          <div class="node node-control node-box-only" style="left: 36px; top: 58px; width: 205px; height: 82px;"
+               data-id="wsl-ansible" data-flows="ops"
+               data-title="Ansible 維運引擎 (run.sh)"
+               data-tag="Non-Cloud · WSL Controller"
+               data-desc="統一執行 bootstrap / intermediate_renewal / intermediate_rekey / root_rotation，透過 checkpoints.yml 階段式確認與執行期密碼輸入（no_log），跨主機編排 NAS、ERP 與 GCP。"
+               data-path="ansible/j-workload-identity/run.sh"
+               data-extra="Roles: localhost_preflight, localhost_ca_sign, localhost_checkpoint">
+            <div class="node-title">Ansible 維運引擎</div>
+            <div class="node-sub">run.sh · Checkpoints · 4 Workflows</div>
+            <span class="node-badge badge-cyan">bootstrap / renewal / rekey / rotate</span>
+          </div>
+
+          <div class="node node-security node-box-only" style="left: 254px; top: 58px; width: 170px; height: 82px;"
+               data-id="wsl-root-ca" data-flows="pki ops"
+               data-title="Offline Root CA (P-256)"
+               data-tag="Non-Cloud · Air-Gapped Key"
+               data-desc="j Private CA 最高信任根，私鑰 (root.key, 0400) 僅存於 WSL 離線目錄，效期 3650 天，永不進入 Git 或複製至其他主機。"
+               data-path="/mnt/d/.../j_private_ca/root.key"
+               data-extra="僅於 Root Rotation / Intermediate 簽發時讀取">
+            <div class="node-title">Offline Root CA</div>
+            <div class="node-sub">root.key · P-256 · 3650d</div>
+            <span class="node-badge badge-rose">僅存 WSL · 永不外流</span>
+          </div>
+
+          <div class="node node-control node-box-only" style="left: 36px; top: 154px; width: 388px; height: 84px;"
+               data-id="wsl-terraform" data-flows="ops pki"
+               data-title="Terraform CLI & Git Repository"
+               data-tag="Non-Cloud · IaC & Public PEMs"
+               data-desc="管理 terraform/j-workload-identity/，提交公鑰 PEM (ca/root.pem, ca/intermediate.pem, ca/retiring/*) 與 credential_configs/，先 plan 審核再 apply 至 GCP。"
+               data-path="terraform/j-workload-identity/"
+               data-extra="State: gs://j-shared-vpc-host-tfstate">
+            <div class="node-title">Terraform CLI &amp; Git (it-maintenance-scripts)</div>
+            <div class="node-sub">modules/x509-workload-identity-pool · ca/*.pem + ca/retiring/</div>
+            <span class="node-badge badge-cyan">零私鑰入庫 · Plan 核准制</span>
+          </div>
+
+          <!-- ==================== ZONE 2: SYNOLOGY NAS (NON-CLOUD) ==================== -->
+          <div class="node node-security node-box-only" style="left: 36px; top: 318px; width: 388px; height: 64px;"
+               data-id="nas-ica" data-flows="pki ops"
+               data-title="j Private Intermediate CA"
+               data-tag="Non-Cloud · Synology NAS"
+               data-desc="中繼憑證私鑰存放於共享資料夾外的 /volume1/@j-private-ca/intermediate_ca_key/intermediate.key (root:root 700/400)，禁止任何 Synology ACL，避免 File Station 下載風險。"
+               data-path="/volume1/@j-private-ca/intermediate_ca_key/"
+               data-extra="效期 1095d · 剩餘 <90d 告警">
+            <div class="node-title">j Private Intermediate CA (1095d)</div>
+            <div class="node-sub">/volume1/@j-private-ca/intermediate_ca_key/ · root:root 700 · 無 ACL</div>
+          </div>
+
+          <div class="node node-onprem node-box-only" style="left: 36px; top: 394px; width: 388px; height: 58px;"
+               data-id="nas-dsm-task" data-flows="pki ops"
+               data-title="DSM Daily Root Task (自動簽發與健檢)"
+               data-tag="Non-Cloud · Synology DSM"
+               data-desc="每日執行 health_check.sh 與 sign_workloads.sh：自動簽發 30 天 NAS leaf 憑證（<10 天續約），並依白名單簽發 ERP CSR。"
+               data-path="nas/j_private_ca/sign_workloads.sh"
+               data-extra="部署自 Git committed revision 至 root-owned bin/">
+            <div class="node-title">DSM Daily Root Task (sign_workloads.sh + health_check.sh)</div>
+            <div class="node-sub">30d Leaf 簽發 · &lt;10d 自動續約 · &lt;5d / &lt;90d 告警通知</div>
+          </div>
+
+          <div class="node node-onprem node-box-only" style="left: 36px; top: 488px; width: 186px; height: 92px;"
+               data-id="nas-jenkins" data-flows="x509 pki"
+               data-title="nas-jenkins (Jenkins Container)"
+               data-tag="Non-Cloud · X.509 Workload"
+               data-desc="執行於 Docker 容器 j-jenkins (UID 1000:1000)，掛載專屬 30 天 Workload Certificate，透過 WIF 直接拉取 GCP Artifact Registry 映像。"
+               data-path="nas/jenkins/jenkins_docker_compose.yml"
+               data-extra="CN: nas-jenkins · 權限: roles/artifactregistry.reader">
+            <div class="node-title">nas-jenkins</div>
+            <div class="node-sub">Jenkins Container<br/>UID 1000:1000 · 30d Cert</div>
+            <span class="node-badge badge-emerald">AR Reader</span>
+          </div>
+
+          <div class="node node-onprem node-box-only" style="left: 238px; top: 488px; width: 186px; height: 92px;"
+               data-id="nas-puller" data-flows="x509 pki"
+               data-title="nas-registry-puller (Host Docker)"
+               data-tag="Non-Cloud · X.509 Workload"
+               data-desc="NAS 主機端 Docker 透過驗證過的 docker-credential-gcr v2.2.1 與 ADC symlink 進行無金鑰 Artifact Registry 拉取；另預留 nas-iot-uploader 白名單身分（無權限）。"
+               data-path="/usr/bin/docker-credential-gcr"
+               data-extra="CN: nas-registry-puller (1026:100) + nas-iot-uploader (0 grants)">
+            <div class="node-title">nas-registry-puller</div>
+            <div class="node-sub">Host Docker + gcr v2.2.1<br/>+ nas-iot-uploader (預留)</div>
+            <span class="node-badge badge-emerald">AR Reader</span>
+          </div>
+
+          <div class="node node-security node-box-only" style="left: 36px; top: 594px; width: 388px; height: 58px;"
+               data-id="nas-smb-csr" data-flows="pki"
+               data-title="SMB CSR 交換目錄 (wif_csr)"
+               data-tag="Non-Cloud · Synology SMB ACL"
+               data-desc="僅允許 STAFF\erp 兩條精確 ACL 規則：投遞 csr.pem 並取回 NAS 簽發的 cert.pem，不可刪除目錄或存取私鑰。"
+               data-path="/volume1/j_NAS/IT/MIS/erp_runs/wif_csr/<cn>/"
+               data-extra="受 nas_baseline 定期檢查 ACL 偏差">
+            <div class="node-title">SMB CSR 交換區 (wif_csr/&lt;cn&gt;/)</div>
+            <div class="node-sub">csr.pem 入 → NAS 簽發 → cert.pem 出 · 嚴格限定 STAFF\erp ACL</div>
+          </div>
+
+          <!-- ==================== ZONE 3: WINDOWS ERP COMPUTER (NON-CLOUD) ==================== -->
+          <div class="node node-onprem node-box-only" style="left: 36px; top: 726px; width: 388px; height: 58px;"
+               data-id="erp-wif-ps1" data-flows="pki ops"
+               data-title="ERP 憑證自動續約模組 (PowerShell)"
+               data-tag="Non-Cloud · Windows ERP"
+               data-desc="由 STAFF\erp 執行 j_wif_certificate.ps1，管理 C:\ProgramData\j-wif\<cn>\（Administrators/SYSTEM 擁有、移除繼承），自動產生 CSR 並透過 SMB 取得新憑證。"
+               data-path="erp/j_wif_certificate.ps1"
+               data-extra="WinRM 由 WSL Ansible 執行 baseline / renew / verify">
+            <div class="node-title">j_wif_certificate.ps1 (STAFF\erp)</div>
+            <div class="node-sub">C:\ProgramData\j-wif\&lt;cn&gt;\ · 本機產生私鑰 · 自動 CSR 續約</div>
+          </div>
+
+          <div class="node node-onprem node-box-only" style="left: 36px; top: 798px; width: 186px; height: 106px;"
+               data-id="erp-dns-fw" data-flows="x509"
+               data-title="erp-dns-firewall"
+               data-tag="Non-Cloud · X.509 Workload"
+               data-desc="動態偵測對外 IP，透過 WIF 更新 GCP Shared VPC 防火牆來源範圍、讀取 Cloudflare Token 與跨專案 mailservice-ingest-api-key，並更新 Cloudflare DNS/WAF。"
+               data-path="erp/update_dns_record_waf_gpcfirewall.ps1"
+               data-extra="CN: erp-dns-firewall · Custom Role + 2x Secret Accessor">
+            <div class="node-title">erp-dns-firewall</div>
+            <div class="node-sub">更新 VPC 防火牆 IP<br/>讀取 2x Secret Manager<br/>同步 Cloudflare WAF</div>
+            <span class="node-badge badge-emerald">Firewall + Secrets</span>
+          </div>
+
+          <div class="node node-onprem node-box-only" style="left: 238px; top: 798px; width: 186px; height: 106px;"
+               data-id="erp-backup" data-flows="x509"
+               data-title="erp-backup"
+               data-tag="Non-Cloud · X.509 Workload"
+               data-desc="使用 X.509 WIF 憑證執行 ERP 資料庫備份同步：讀取 j-it-data 憑證檔並將資料庫備份寫入 j-erp-backups。"
+               data-path="erp/backup_lydb_to_google_cloud_storage_sync_certificate.ps1"
+               data-extra="CN: erp-backup · GCS Viewer + ObjectAdmin">
+            <div class="node-title">erp-backup</div>
+            <div class="node-sub">ERP DB 備份與憑證同步<br/>讀 j-it-data<br/>寫 j-erp-backups</div>
+            <span class="node-badge badge-emerald">GCS Backup</span>
+          </div>
+
+          <!-- ==================== ZONE 4: GCP HOST PROJECT (GCP SVG ICONS) ==================== -->
+          <div class="node node-security" style="left: 520px; top: 64px; width: 422px; height: 100px;"
+               data-id="gcp-wif-pool" data-flows="x509 ops"
+               data-title="GCP Workload Identity Pool: j-onprem"
+               data-tag="GCP · Security & Identity"
+               data-desc="中央 X.509 Provider (j-private-ca) 僅信任 j Private CA Trust Store，透過 sts.mtls.googleapis.com 驗證 mTLS 憑證與 CN Allowlist，核發短期 Federated Token。"
+               data-path="terraform/j-workload-identity/main.tf"
+               data-extra="Pool: projects/119/.../workloadIdentityPools/j-onprem">
+            <div class="icon-wrap">
+              <img src="gcp-svg-icons/Security Identity/SVG/SecurityIdentity-512-color.svg" alt="GCP IAM WIF" onerror="this.style.display='none';this.nextElementSibling.style.display='block';" />
+              <span class="icon-fallback" style="display:none;">IAM</span>
+            </div>
+            <div class="node-text">
+              <div class="node-title">WIF Pool: j-onprem + STS mTLS</div>
+              <div class="node-sub">Provider: j-private-ca · sts.mtls.googleapis.com<br/>Trust Store: Root + Intermediate + retiring/ · CN Allowlist</div>
+              <span class="node-badge badge-rose">Direct Principal Grants · 零 Service Account</span>
+            </div>
+          </div>
+
+          <div class="node node-gcp" style="left: 520px; top: 204px; width: 205px; height: 76px;"
+               data-id="gcp-vpc-fw" data-flows="x509"
+               data-title="Shared VPC Firewall Rules"
+               data-tag="GCP · Networking"
+               data-desc="由自訂最小權限角色 jFirewallSourceRangeUpdater 保護，僅允許 erp-dns-firewall principal 讀取與更新防火牆來源 IP 範圍。"
+               data-path="terraform/j-workload-identity/grants.tf"
+               data-extra="Perms: compute.firewalls.get/list/update, networks.updatePolicy">
+            <div class="icon-wrap">
+              <img src="gcp-svg-icons/Networking/SVG/Networking-512-color-rgb.svg" alt="GCP Networking" onerror="this.style.display='none';this.nextElementSibling.style.display='block';" />
+              <span class="icon-fallback" style="display:none;">VPC</span>
+            </div>
+            <div class="node-text">
+              <div class="node-title">Shared VPC Firewall</div>
+              <div class="node-sub">Custom Role 更新來源 IP</div>
+              <span class="node-badge badge-amber">erp-dns-firewall</span>
+            </div>
+          </div>
+
+          <div class="node node-security" style="left: 737px; top: 204px; width: 205px; height: 76px;"
+               data-id="gcp-secret-cf" data-flows="x509"
+               data-title="Secret Manager (Host)"
+               data-tag="GCP · Security & Identity"
+               data-desc="存放 j-cloudflare-update-api-token，僅授權 erp-dns-firewall principal 具 roles/secretmanager.secretAccessor 權限。"
+               data-path="terraform/j-workload-identity/workloads.tf"
+               data-extra="Secret: j-cloudflare-update-api-token">
+            <div class="icon-wrap">
+              <img src="gcp-svg-icons/Security Identity/SVG/SecurityIdentity-512-color.svg" alt="GCP Secret Manager" onerror="this.style.display='none';this.nextElementSibling.style.display='block';" />
+              <span class="icon-fallback" style="display:none;">SEC</span>
+            </div>
+            <div class="node-text">
+              <div class="node-title">Secret Manager</div>
+              <div class="node-sub">cloudflare-update-api-token</div>
+              <span class="node-badge badge-rose">secretAccessor</span>
+            </div>
+          </div>
+
+          <div class="node node-storage" style="left: 520px; top: 344px; width: 422px; height: 86px;"
+               data-id="gcp-gcs-host" data-flows="x509 ops"
+               data-title="Cloud Storage Buckets (Host & ERP)"
+               data-tag="GCP · Storage"
+               data-desc="包含 j-it-data (erp-backup 唯讀)、j-erp-backups (erp-backup objectAdmin 備份寫入) 與 Terraform Remote State Bucket (j-shared-vpc-host-tfstate)。"
+               data-path="terraform/j-workload-identity/workloads.tf"
+               data-extra="Additive *_iam_member 綁定 principal://">
+            <div class="icon-wrap">
+              <img src="gcp-svg-icons/Storage/SVG/Storage-512-color.svg" alt="GCP Cloud Storage" onerror="this.style.display='none';this.nextElementSibling.style.display='block';" />
+              <span class="icon-fallback" style="display:none;">GCS</span>
+            </div>
+            <div class="node-text">
+              <div class="node-title">Cloud Storage (GCS Buckets)</div>
+              <div class="node-sub">• j-it-data (objectViewer) · j-erp-backups (objectAdmin)<br/>• j-shared-vpc-host-tfstate (Terraform State)</div>
+              <span class="node-badge badge-violet">erp-backup + Terraform Backend</span>
+            </div>
+          </div>
+
+          <!-- ==================== ZONE 5: CROSS-PROJECT & EXTERNAL ==================== -->
+          <div class="node node-gcp" style="left: 1020px; top: 64px; width: 382px; height: 112px;"
+               data-id="gcp-ar-cross" data-flows="x509"
+               data-title="跨專案 Artifact Registry (us-west1)"
+               data-tag="GCP · Containers (Cross-Project)"
+               data-desc="兩個獨立 GCP 專案的容器映像庫直接信任中央 j-onprem Pool，授予 nas-jenkins 與 nas-registry-puller roles/artifactregistry.reader，不需新建 Pool 或金鑰。"
+               data-path="terraform/j-workload-identity/workloads.tf"
+               data-extra="1) j-staffportal-j-com/pythonportal  2) j-website/vlmcsd">
+            <div class="icon-wrap">
+              <img src="gcp-svg-icons/Containers/SVG/Containers-512-color.svg" alt="GCP Artifact Registry" onerror="this.style.display='none';this.nextElementSibling.style.display='block';" />
+              <span class="icon-fallback" style="display:none;">AR</span>
+            </div>
+            <div class="node-text">
+              <div class="node-title">跨專案 Artifact Registry (us-west1)</div>
+              <div class="node-sub">• j-staffportal: j-pythonportal-registry<br/>• j-website: j-vlmcsd-registry</div>
+              <span class="node-badge badge-amber">nas-jenkins &amp; nas-registry-puller</span>
+            </div>
+          </div>
+
+          <div class="node node-external node-box-only" style="left: 1020px; top: 318px; width: 382px; height: 112px;"
+               data-id="ext-cloudflare" data-flows="x509"
+               data-title="Cloudflare DNS & WAF (外部服務)"
+               data-tag="External · Non-Cloud Box"
+               data-desc="由 ERP 的 erp-dns-firewall 腳本持從 GCP Secret Manager 取得的 API Token 與 mailservice-ingest-api-key 自動更新 DNS 紀錄與 WAF 規則。"
+               data-path="openspec/specs/cloudflare-waf-mailservice-key/spec.md"
+               data-extra="支援本地快取 fallback 機制">
+            <div class="node-title">Cloudflare DNS &amp; WAF (外部服務)</div>
+            <div class="node-sub">由 erp-dns-firewall 讀取 GCP Secret Manager 金鑰後<br/>自動更新 DNS A/AAAA 紀錄與 WAF 防護規則</div>
+            <span class="node-badge badge-cyan">External SaaS · 圓角方框表示</span>
+          </div>
+
+          <!-- ==================== ZONE 6A: AWS ACCOUNT (DERIVED WIF) ==================== -->
+          <div class="node node-aws" style="left: 535px; top: 562px; width: 280px; height: 74px;"
+               data-id="aws-batch" data-flows="aws-wif"
+               data-title="AWS Batch (Mail Drain Job)"
+               data-tag="AWS · Compute"
+               data-desc="j-serverless-mailservice 的郵件汲取排程作業，負責將郵件封裝為 Ingest Record 並安全上傳至 GCP。"
+               data-path="j-serverless-mailservice/src/drain_job/gcp_auth.py"
+               data-extra="零靜態 GCP 金鑰，完全使用 AWS→GCP WIF">
+            <div class="icon-wrap">
+              <img src="aws-svg-icons/Architecture-Service-Icons/Architecture-Service-Icons_01312024/Arch_Compute/48/Arch_AWS-Batch_48.svg" alt="AWS Batch" onerror="this.style.display='none';this.nextElementSibling.style.display='block';" />
+              <span class="icon-fallback" style="display:none;">BATCH</span>
+            </div>
+            <div class="node-text">
+              <div class="node-title">AWS Batch Drain Job</div>
+              <div class="node-sub">無伺服器郵件批次汲取作業</div>
+              <span class="node-badge badge-orange">j-serverless-mailservice</span>
+            </div>
+          </div>
+
+          <div class="node node-aws" style="left: 535px; top: 674px; width: 280px; height: 74px;"
+               data-id="aws-fargate" data-flows="aws-wif"
+               data-title="AWS Fargate Task Runtime"
+               data-tag="AWS · Containers"
+               data-desc="執行 Python Drain Job 容器 (google.auth.aws + boto3)，透過 Task Metadata 取得短期 AWS 憑證。"
+               data-path="j-serverless-mailservice/src/drain_job/gcp_auth.py"
+               data-extra="Serverless Container Execution">
+            <div class="icon-wrap">
+              <img src="aws-svg-icons/Architecture-Service-Icons/Architecture-Service-Icons_01312024/Arch_Containers/48/Arch_AWS-Fargate_48.svg" alt="AWS Fargate" onerror="this.style.display='none';this.nextElementSibling.style.display='block';" />
+              <span class="icon-fallback" style="display:none;">FARG</span>
+            </div>
+            <div class="node-text">
+              <div class="node-title">AWS Fargate Task</div>
+              <div class="node-sub">Python 容器 · google.auth.aws</div>
+              <span class="node-badge badge-orange">Serverless Runtime</span>
+            </div>
+          </div>
+
+          <div class="node node-aws" style="left: 535px; top: 786px; width: 280px; height: 84px;"
+               data-id="aws-iam-role" data-flows="aws-wif"
+               data-title="AWS IAM Role: mailservice-batch-task-role"
+               data-tag="AWS · Security & Identity"
+               data-desc="跨雲契約固定名稱角色，簽署 AWS STS GetCallerIdentity 請求並送往 GCP STS 進行跨雲身分交換。"
+               data-path="j-serverless-mailservice/openspec/specs/mail-aws-infrastructure/spec.md"
+               data-extra="Cross-Root Contract: attribute.aws_role == 'mailservice-batch-task-role'">
+            <div class="icon-wrap">
+              <img src="aws-svg-icons/Architecture-Service-Icons/Architecture-Service-Icons_01312024/Arch_Security-Identity-Compliance/48/Arch_AWS-Identity-and-Access-Management_48.svg" alt="AWS IAM" onerror="this.style.display='none';this.nextElementSibling.style.display='block';" />
+              <span class="icon-fallback" style="display:none;">IAM</span>
+            </div>
+            <div class="node-text">
+              <div class="node-title">AWS IAM Task Role</div>
+              <div class="node-sub">mailservice-batch-task-role<br/>Signed GetCallerIdentity</div>
+              <span class="node-badge badge-orange">跨雲信任契約</span>
+            </div>
+          </div>
+
+          <!-- ==================== ZONE 6B: GCP MAILSERVICE PROJECT ==================== -->
+          <div class="node node-security" style="left: 880px; top: 562px; width: 252px; height: 92px;"
+               data-id="gcp-mail-wif" data-flows="aws-wif"
+               data-title="GCP WIF Pool: mailservice-aws-pool"
+               data-tag="GCP · Security & Identity"
+               data-desc="驗證 AWS Account ID 與 attribute.aws_role == 'mailservice-batch-task-role'，核發短期憑證並模擬無金鑰 Service Account: mailservice-batch-writer。"
+               data-path="j-serverless-mailservice/terraform/gcp/wif.tf"
+               data-extra="Provider: aws-batch → Impersonate mailservice-batch-writer">
+            <div class="icon-wrap">
+              <img src="gcp-svg-icons/Security Identity/SVG/SecurityIdentity-512-color.svg" alt="GCP WIF AWS Pool" onerror="this.style.display='none';this.nextElementSibling.style.display='block';" />
+              <span class="icon-fallback" style="display:none;">WIF</span>
+            </div>
+            <div class="node-text">
+              <div class="node-title">WIF: mailservice-aws-pool</div>
+              <div class="node-sub">Provider: aws-batch<br/>→ SA: mailservice-batch-writer</div>
+              <span class="node-badge badge-rose">AWS→GCP 聯合身分</span>
+            </div>
+          </div>
+
+          <div class="node node-security" style="left: 1146px; top: 562px; width: 238px; height: 92px;"
+               data-id="gcp-mail-secret" data-flows="x509 aws-wif"
+               data-title="Secret: mailservice-ingest-api-key"
+               data-tag="GCP · Security & Identity"
+               data-desc="僅授權兩個存取者：1) 跨專案 j-onprem/subject/erp-dns-firewall principal；2) pythonportal Cloud Run SA。AWS Batch 無權存取。"
+               data-path="j-serverless-mailservice/terraform/gcp/variables.tf"
+               data-extra="2026-11-19 起以 X.509 WIF 取代舊 SA Key">
+            <div class="icon-wrap">
+              <img src="gcp-svg-icons/Security Identity/SVG/SecurityIdentity-512-color.svg" alt="GCP Secret Manager" onerror="this.style.display='none';this.nextElementSibling.style.display='block';" />
+              <span class="icon-fallback" style="display:none;">SEC</span>
+            </div>
+            <div class="node-text">
+              <div class="node-title">Secret Manager</div>
+              <div class="node-sub">mailservice-ingest-api-key<br/>唯二授權: erp-dns-firewall / portal</div>
+              <span class="node-badge badge-rose">跨專案 WIF 授權</span>
+            </div>
+          </div>
+
+          <div class="node node-storage" style="left: 880px; top: 704px; width: 252px; height: 78px;"
+               data-id="gcp-mail-gcs" data-flows="aws-wif"
+               data-title="Cloud Storage (Mail Ingest Bucket)"
+               data-tag="GCP · Storage"
+               data-desc="接收來自 AWS Batch Drain Job (透過 mailservice-batch-writer SA 模擬) 上傳的郵件 Ingest Records。"
+               data-path="j-serverless-mailservice/terraform/gcp/modules/mail_ingest/"
+               data-extra="Writer: mailservice-batch-writer (Keyless SA)">
+            <div class="icon-wrap">
+              <img src="gcp-svg-icons/Storage/SVG/Storage-512-color.svg" alt="GCP Cloud Storage" onerror="this.style.display='none';this.nextElementSibling.style.display='block';" />
+              <span class="icon-fallback" style="display:none;">GCS</span>
+            </div>
+            <div class="node-text">
+              <div class="node-title">Mail Ingest Bucket</div>
+              <div class="node-sub">接收 AWS Batch 上傳郵件紀錄</div>
+              <span class="node-badge badge-violet">GCS Ingest</span>
+            </div>
+          </div>
+
+          <div class="node node-gcp" style="left: 1146px; top: 704px; width: 238px; height: 78px;"
+               data-id="gcp-cloud-run" data-flows="aws-wif"
+               data-title="Cloud Run: pythonportal"
+               data-tag="GCP · Serverless Computing"
+               data-desc="員工入口網站後端，其 Runtime Service Account 具 mailservice-ingest-api-key 讀取權限，並整合郵件系統資料。"
+               data-path="j-serverless-mailservice/openspec/specs/mail-gcp-infrastructure/spec.md"
+               data-extra="Runtime SA 存取 Secret Manager">
+            <div class="icon-wrap">
+              <img src="gcp-svg-icons/Serverless Computing/SVG/ServerlessComputing-512-color.svg" alt="GCP Cloud Run" onerror="this.style.display='none';this.nextElementSibling.style.display='block';" />
+              <span class="icon-fallback" style="display:none;">RUN</span>
+            </div>
+            <div class="node-text">
+              <div class="node-title">Cloud Run (pythonportal)</div>
+              <div class="node-sub">員工入口網站後端 Runtime SA</div>
+              <span class="node-badge badge-amber">Serverless</span>
+            </div>
+          </div>
+
+          <div class="node node-storage" style="left: 880px; top: 814px; width: 504px; height: 68px;"
+               data-id="gcp-firestore" data-flows="aws-wif"
+               data-title="Cloud Firestore (Mailservice DB)"
+               data-tag="GCP · Databases"
+               data-desc="儲存 j-serverless-mailservice 的郵件索引、狀態與中繼資料。"
+               data-path="j-serverless-mailservice/terraform/gcp/"
+               data-extra="Dedicated Firestore Database">
+            <div class="icon-wrap">
+              <img src="gcp-svg-icons/Databases/SVG/Databases-512-color.svg" alt="GCP Firestore" onerror="this.style.display='none';this.nextElementSibling.style.display='block';" />
+              <span class="icon-fallback" style="display:none;">DB</span>
+            </div>
+            <div class="node-text">
+              <div class="node-title">Cloud Firestore — Mailservice Metadata &amp; Index Database</div>
+              <div class="node-sub">儲存郵件處理狀態、索引與系統中繼資料 (j-serverless-mailse-&lt;hash&gt;)</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Legend (Placed OUTSIDE all boundary boxes per architecture-diagram skill) -->
+    <div class="legend-bar">
+      <div class="legend-item">
+        <span class="legend-swatch" style="background: rgba(8, 51, 68, 0.78); border-color: #22d3ee;"></span>
+        <span>控制平面 / IaC (非雲端圓角框)</span>
+      </div>
+      <div class="legend-item">
+        <span class="legend-swatch" style="background: rgba(6, 78, 59, 0.78); border-color: #34d399;"></span>
+        <span>地端工作負載 NAS / ERP (非雲端圓角框)</span>
+      </div>
+      <div class="legend-item">
+        <span class="legend-swatch" style="background: rgba(136, 19, 55, 0.78); border-color: #fb7185;"></span>
+        <span>PKI / WIF / Secret Manager 安全元件</span>
+      </div>
+      <div class="legend-item">
+        <span class="legend-swatch" style="background: rgba(120, 53, 15, 0.62); border-color: #fbbf24;"></span>
+        <span>GCP 雲端服務 (GCP SVG Icon)</span>
+      </div>
+      <div class="legend-item">
+        <span class="legend-swatch" style="background: rgba(154, 52, 18, 0.68); border-color: #fb923c;"></span>
+        <span>AWS 雲端服務 (AWS SVG Icon)</span>
+      </div>
+      <div class="legend-item">
+        <span class="legend-line" style="border-top-style: dashed; border-top-color: #fb7185;"></span>
+        <span>憑證簽發 / 跨專案安全授權</span>
+      </div>
+      <div class="legend-item">
+        <span class="legend-line" style="border-top-style: solid; border-top-color: #34d399;"></span>
+        <span>mTLS X.509 STS Token 交換</span>
+      </div>
+    </div>
+
+    <!-- Interactive Node Inspector -->
+    <div class="inspector" id="inspector">
+      <div class="inspector-header">
+        <div class="inspector-title" id="insp-title">📌 GCP Workload Identity Pool: j-onprem</div>
+        <div class="inspector-tag" id="insp-tag">GCP · Security &amp; Identity</div>
+      </div>
+      <div class="inspector-body" id="insp-desc">
+        中央 X.509 Provider (j-private-ca) 僅信任 j Private CA Trust Store，透過 sts.mtls.googleapis.com 驗證 mTLS 憑證與 CN Allowlist，核發短期 Federated Token。
+      </div>
+      <div class="inspector-meta">
+        <span>路徑：<code id="insp-path">terraform/j-workload-identity/main.tf</code></span>
+        <span>規格：<code id="insp-extra">Pool: projects/119/.../workloadIdentityPools/j-onprem</code></span>
+      </div>
+    </div>
+
+    <!-- 3 Summary Cards (per architecture-diagram skill) -->
+    <div class="cards-grid">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-dot" style="background: #fb7185;"></div>
+          <h3>零靜態金鑰與最小權限</h3>
+        </div>
+        <ul>
+          <li>• <strong>雙層私有 PKI</strong>：離線 Root (3650d) 僅存 WSL，NAS Intermediate (1095d) 置於共享目錄外並禁止 Synology ACL。</li>
+          <li>• <strong>Direct Principal Grants</strong>：地端 5 個 CN 直接綁定資源 IAM，無需 Service Account 或 JSON Key。</li>
+          <li>• <strong>即時撤銷機制</strong>：自 Terraform Allowlist 移除 CN 即可立即阻斷 Token 核發。</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-dot" style="background: #22d3ee;"></div>
+          <h3>單一指令全生命週期維運</h3>
+        </div>
+        <ul>
+          <li>• <strong>Check-then-Checkpoint</strong>：所有 playbook 先跑 <code>--check --diff</code>，實跑時每個階段於說明點確認一次。</li>
+          <li>• <strong>無停機憑證輪替</strong>：<code>ca/retiring/</code> 讓新舊 CA 並存，待全部 Workload 通過 Token 驗證後才執行 <code>finalize</code> 移除舊 CA。</li>
+          <li>• <strong>權限基線守護</strong>：自動稽核 NAS POSIX/ACL 與 Windows ERP 目錄擁有權。</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-dot" style="background: #fb923c;"></div>
+          <h3>跨專案與 AWS→GCP 衍生應用</h3>
+        </div>
+        <ul>
+          <li>• <strong>跨專案復用 Pool</strong>：<code>staffportal</code>、<code>website</code> 與 <code>mailservice</code> 僅需新增 IAM member 即可信任 <code>j-onprem</code>。</li>
+          <li>• <strong>AWS→GCP 跨雲 WIF</strong>：AWS Batch on Fargate 以 <code>mailservice-batch-task-role</code> 換取 GCP 短期憑證。</li>
+          <li>• <strong>職責隔離</strong>：AWS Batch 僅寫入 Ingest Bucket，無法讀取 <code>mailservice-ingest-api-key</code>。</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <span>Generated from jp/it-maintenance-scripts &amp; jp/j-serverless-mailservice</span>
+      <span>Icons: Relative paths to architecture_icons/ (gcp-svg-icons &amp; aws-svg-icons) · High-Contrast Dark Theme</span>
+    </div>
+  </div>
+
+  <script>
+    // Interactive Flow Filter
+    const filterButtons = document.querySelectorAll('.filter-pill');
+    const nodes = document.querySelectorAll('.node');
+    const edges = document.querySelectorAll('.flow-edge');
+
+    filterButtons.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        filterButtons.forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+        const filter = btn.dataset.filter;
+
+        nodes.forEach((n) => {
+          const flows = (n.dataset.flows || '').split(' ');
+          if (filter === 'all' || flows.includes(filter)) {
+            n.classList.remove('dimmed');
+          } else {
+            n.classList.add('dimmed');
+          }
+        });
+
+        edges.forEach((e) => {
+          const flows = (e.dataset.flows || '').split(' ');
+          if (filter === 'all' || flows.includes(filter)) {
+            e.classList.remove('dimmed');
+          } else {
+            e.classList.add('dimmed');
+          }
+        });
+      });
+    });
+
+    // Interactive Node Inspector
+    const inspTitle = document.getElementById('insp-title');
+    const inspTag = document.getElementById('insp-tag');
+    const inspDesc = document.getElementById('insp-desc');
+    const inspPath = document.getElementById('insp-path');
+    const inspExtra = document.getElementById('insp-extra');
+
+    nodes.forEach((node) => {
+      node.addEventListener('click', () => {
+        nodes.forEach((n) => n.classList.remove('selected'));
+        node.classList.add('selected');
+        inspTitle.textContent = '📌 ' + (node.dataset.title || '');
+        inspTag.textContent = node.dataset.tag || '';
+        inspDesc.textContent = node.dataset.desc || '';
+        inspPath.textContent = node.dataset.path || '';
+        inspExtra.textContent = node.dataset.extra || '';
+      });
+    });
+
+    // Export Toolbar Functions (architecture-diagram skill standard)
+    async function captureDiagramCanvas() {
+      const target = document.getElementById('report-container');
+      const rect = target.getBoundingClientRect();
+      const pad = 32;
+      return html2canvas(document.body, {
+        backgroundColor: '#020617',
+        scale: 2,
+        useCORS: true,
+        x: Math.max(0, rect.left + window.scrollX - pad),
+        y: Math.max(0, rect.top + window.scrollY - pad),
+        width: rect.width + pad * 2,
+        height: rect.height + pad * 2,
+        ignoreElements: (el) => el.classList && el.classList.contains('toolbar')
+      });
+    }
+
+    async function copyAsImage() {
+      try {
+        const canvas = await captureDiagramCanvas();
+        canvas.toBlob(async (blob) => {
+          await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+          alert('已複製高解析度架構圖至剪貼簿！');
+        });
+      } catch (err) {
+        alert('複製失敗（請確認於 https/localhost 環境執行）：' + err.message);
+      }
+    }
+
+    async function downloadPNG() {
+      const canvas = await captureDiagramCanvas();
+      const link = document.createElement('a');
+      link.download = 'j-wif-architecture.png';
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    }
+
+    async function downloadPDF() {
+      const canvas = await captureDiagramCanvas();
+      const imgData = canvas.toDataURL('image/png');
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF({
+        orientation: canvas.width > canvas.height ? 'landscape' : 'portrait',
+        unit: 'px',
+        format: [canvas.width, canvas.height]
+      });
+      pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+      pdf.save('j-wif-architecture.pdf');
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,1149 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>j Hybrid Cloud Architecture — Shared VPC &amp; WireGuard Gateway</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js" integrity="sha384-ZZ1pncU3bQe8y31yfZdMFdSpttDoPmOZg2wguVK9almUodir1PghgT0eY7Mrty8H" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js" integrity="sha384-en/ztfPSRkGfME4KIm05joYXynqzUgbsG5nMrj/xEFAHXkeZfO3yMK8QQ+mP7p1/" crossorigin="anonymous"></script>
+  <style>
+    :root {
+      --bg-canvas: #020617;
+      --bg-surface: #0b1224;
+      --bg-card: #0f172a;
+      --border-subtle: #1e293b;
+      --border-strong: #334155;
+      --text-primary: #f8fafc;
+      --text-secondary: #cbd5e1;
+      --text-muted: #94a3b8;
+      --cyan: #22d3ee;
+      --emerald: #34d399;
+      --violet: #a78bfa;
+      --amber: #fbbf24;
+      --rose: #fb7185;
+      --orange: #fb923c;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background-color: var(--bg-canvas);
+      color: var(--text-primary);
+      font-family: 'JetBrains Mono', 'Noto Sans TC', monospace, sans-serif;
+      line-height: 1.5;
+      padding: 24px 20px 40px;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1380px;
+      margin: 0 auto;
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+      margin-bottom: 18px;
+      flex-wrap: wrap;
+    }
+
+    .title-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .title-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .pulse-dot {
+      width: 11px;
+      height: 11px;
+      border-radius: 50%;
+      background: var(--emerald);
+      box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.75);
+      animation: pulse 2s infinite;
+      flex-shrink: 0;
+    }
+
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.75); }
+      70% { box-shadow: 0 0 0 10px rgba(52, 211, 153, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0); }
+    }
+
+    h1 {
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: #ffffff;
+    }
+
+    .subtitle {
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    /* Export Toolbar */
+    .toolbar {
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .toolbar-actions {
+      display: none;
+      align-items: center;
+      gap: 6px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-strong);
+      border-radius: 8px;
+      padding: 4px;
+    }
+
+    .toolbar.open .toolbar-actions {
+      display: flex;
+    }
+
+    .toolbar-btn, .toolbar-toggle {
+      background: var(--bg-card);
+      color: var(--text-primary);
+      border: 1px solid var(--border-strong);
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-family: inherit;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+    }
+
+    .toolbar-actions .toolbar-btn {
+      border: none;
+      background: transparent;
+    }
+
+    .toolbar-btn:hover, .toolbar-toggle:hover {
+      background: #1e293b;
+      border-color: var(--cyan);
+    }
+
+    /* Interactive Flow Filter Bar */
+    .filter-bar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 14px;
+      padding: 10px 14px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 10px;
+    }
+
+    .filter-label {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text-muted);
+      margin-right: 4px;
+      text-transform: uppercase;
+    }
+
+    .filter-pill {
+      background: var(--bg-card);
+      color: var(--text-secondary);
+      border: 1px solid var(--border-strong);
+      border-radius: 999px;
+      padding: 5px 12px;
+      font-family: inherit;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .filter-pill:hover {
+      color: #ffffff;
+      border-color: var(--cyan);
+    }
+
+    .filter-pill.active {
+      background: rgba(34, 211, 238, 0.18);
+      color: #ffffff;
+      border-color: var(--cyan);
+      box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.35);
+    }
+
+    .filter-pill[data-flow="vpn"].active {
+      background: rgba(251, 146, 60, 0.22);
+      border-color: var(--orange);
+      box-shadow: 0 0 0 1px rgba(251, 146, 60, 0.35);
+    }
+
+    .filter-pill[data-flow="ingress"].active {
+      background: rgba(251, 113, 133, 0.22);
+      border-color: var(--rose);
+      box-shadow: 0 0 0 1px rgba(251, 113, 133, 0.35);
+    }
+
+    .filter-pill[data-flow="smtp"].active {
+      background: rgba(52, 211, 153, 0.2);
+      border-color: var(--emerald);
+      box-shadow: 0 0 0 1px rgba(52, 211, 153, 0.35);
+    }
+
+    .filter-pill[data-flow="egress"].active {
+      background: rgba(251, 191, 36, 0.2);
+      border-color: var(--amber);
+      box-shadow: 0 0 0 1px rgba(251, 191, 36, 0.35);
+    }
+
+    .filter-pill[data-flow="control"].active {
+      background: rgba(167, 139, 250, 0.22);
+      border-color: var(--violet);
+      box-shadow: 0 0 0 1px rgba(167, 139, 250, 0.35);
+    }
+
+    /* Main Diagram Card */
+    .diagram-card {
+      background: var(--bg-canvas);
+      border: 1px solid var(--border-strong);
+      border-radius: 14px;
+      padding: 12px;
+      overflow-x: auto;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55);
+    }
+
+    svg#arch-svg {
+      display: block;
+      width: 100%;
+      min-width: 1120px;
+      height: auto;
+      user-select: none;
+    }
+
+    /* Interactive SVG States */
+    .node-group {
+      cursor: pointer;
+      transition: opacity 0.2s ease, filter 0.2s ease;
+    }
+
+    .node-group:hover {
+      filter: brightness(1.16);
+    }
+
+    .node-group.selected rect.node-frame {
+      stroke-width: 2.8 !important;
+      filter: drop-shadow(0 0 8px rgba(34, 211, 238, 0.6));
+    }
+
+    .flow-path {
+      transition: opacity 0.2s ease, stroke-width 0.2s ease;
+    }
+
+    svg.filtering .flow-path {
+      opacity: 0.1;
+    }
+
+    svg.filtering .flow-path.flow-match {
+      opacity: 1;
+      stroke-width: 2.5;
+    }
+
+    svg.filtering .flow-label-group {
+      opacity: 0.12;
+    }
+
+    svg.filtering .flow-label-group.flow-match {
+      opacity: 1;
+    }
+
+    /* Icon badge inside foreignObject */
+    .gcp-icon-wrap {
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #ffffff;
+      border-radius: 6px;
+      padding: 3px;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+    }
+
+    .gcp-icon-wrap img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+    }
+
+    /* Inspector Panel */
+    .inspector {
+      margin-top: 14px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-strong);
+      border-left: 4px solid var(--cyan);
+      border-radius: 10px;
+      padding: 14px 18px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .inspector-main {
+      flex: 1;
+      min-width: 280px;
+    }
+
+    .inspector-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: #ffffff;
+      margin-bottom: 4px;
+    }
+
+    .inspector-desc {
+      font-size: 11.5px;
+      color: var(--text-secondary);
+      line-height: 1.65;
+    }
+
+    .inspector-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 8px;
+    }
+
+    .inspector-tag {
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 4px;
+      background: #1e293b;
+      color: var(--cyan);
+      border: 1px solid #334155;
+    }
+
+    /* Summary Cards */
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+      margin-top: 18px;
+    }
+
+    @media (max-width: 960px) {
+      .cards-grid { grid-template-columns: 1fr; }
+    }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-strong);
+      border-radius: 10px;
+      padding: 16px 18px;
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .card-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .card-dot.amber { background: var(--amber); }
+    .card-dot.emerald { background: var(--emerald); }
+    .card-dot.rose { background: var(--rose); }
+
+    .card h3 {
+      font-size: 13px;
+      font-weight: 700;
+      color: #ffffff;
+    }
+
+    .card ul {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .card li {
+      font-size: 11.5px;
+      color: var(--text-secondary);
+      line-height: 1.55;
+    }
+
+    .card li strong {
+      color: #ffffff;
+    }
+
+    .footer {
+      margin-top: 18px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border-subtle);
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 8px;
+      font-size: 10.5px;
+      color: var(--text-muted);
+    }
+
+    @media print {
+      .toolbar, .filter-bar { display: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container" id="report-container">
+    <!-- Header -->
+    <div class="header">
+      <div class="title-group">
+        <div class="title-row">
+          <span class="pulse-dot"></span>
+          <h1>j Hybrid Cloud Infrastructure — Shared VPC &amp; WireGuard Gateway</h1>
+        </div>
+        <div class="subtitle">
+          Repo: jp/it-maintenance-scripts · terraform/j-shared-vpc + ansible/j-shared-vpc-wireguard-gateway + vm-wireguard-gateway
+        </div>
+      </div>
+
+      <div class="toolbar" id="export-toolbar">
+        <div class="toolbar-actions">
+          <button class="toolbar-btn" onclick="copyAsImage()" title="複製高解析 PNG 至剪貼簿">📋 Copy</button>
+          <button class="toolbar-btn" onclick="downloadPNG()" title="下載高解析 PNG">🖼️ PNG</button>
+          <button class="toolbar-btn" onclick="downloadPDF()" title="匯出單頁深色 PDF">📄 PDF</button>
+        </div>
+        <button class="toolbar-toggle" onclick="toggleToolbar()" aria-label="匯出選項">⋯</button>
+      </div>
+    </div>
+
+    <!-- Interactive Flow Filter Bar -->
+    <div class="filter-bar">
+      <span class="filter-label">流量篩選：</span>
+      <button class="filter-pill active" data-flow="all">全部連線 (All)</button>
+      <button class="filter-pill" data-flow="ingress">Cloudflare → Nginx L7 → Cloud Run</button>
+      <button class="filter-pill" data-flow="smtp">Cloud Run → Nginx L4 (:2525) → Gmail SMTP</button>
+      <button class="filter-pill" data-flow="vpn">VPC ↔ WireGuard (wg0) ↔ 地端 LAN / MSSQL</button>
+      <button class="filter-pill" data-flow="egress">Tagged Egress NAT (IPv4/IPv6 SNAT) → 地端 NAS</button>
+      <button class="filter-pill" data-flow="control">Cloud DNS / Secret Manager / Certbot / IaC</button>
+    </div>
+
+    <!-- Main SVG Architecture Diagram -->
+    <div class="diagram-card">
+      <svg id="arch-svg" viewBox="0 0 1320 920" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="j Hybrid Cloud Architecture Diagram">
+        <defs>
+          <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+            <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" stroke-width="0.6" />
+          </pattern>
+
+          <!-- High-contrast arrowheads -->
+          <marker id="arrow-cyan" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#22d3ee" />
+          </marker>
+          <marker id="arrow-rose" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#fb7185" />
+          </marker>
+          <marker id="arrow-emerald" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#34d399" />
+          </marker>
+          <marker id="arrow-orange" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#fb923c" />
+          </marker>
+          <marker id="arrow-orange-start" markerWidth="10" markerHeight="7" refX="1" refY="3.5" orient="auto">
+            <polygon points="10 0, 0 3.5, 10 7" fill="#fb923c" />
+          </marker>
+          <marker id="arrow-amber" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#fbbf24" />
+          </marker>
+          <marker id="arrow-violet" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#a78bfa" />
+          </marker>
+          <marker id="arrow-slate" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#cbd5e1" />
+          </marker>
+        </defs>
+
+        <!-- Background Grid -->
+        <rect width="1320" height="920" fill="#020617" />
+        <rect width="1320" height="920" fill="url(#grid)" />
+
+        <!-- ========================================================= -->
+        <!-- LAYER 1: REGION / ENVIRONMENT BOUNDARY BOXES              -->
+        <!-- ========================================================= -->
+
+        <!-- GCP Organization & Shared VPC Host Project Boundary -->
+        <rect x="24" y="146" width="912" height="670" rx="12" fill="rgba(120, 53, 15, 0.14)" stroke="#fbbf24" stroke-width="2" stroke-dasharray="8,4" />
+        <text x="42" y="170" fill="#fde68a" font-size="12" font-weight="700">GCP Shared VPC Host Project · j-shared-vpc-host (Org: 300391802463)</text>
+
+        <!-- Shared VPC Network Container -->
+        <rect x="312" y="186" width="606" height="612" rx="10" fill="rgba(15, 23, 42, 0.55)" stroke="#38bdf8" stroke-width="1.5" stroke-dasharray="6,4" />
+        <text x="328" y="206" fill="#7dd3fc" font-size="11" font-weight="700">Shared VPC Networks (Dual-Stack IPv4 + Standard Tier IPv6)</text>
+
+        <!-- On-Premises Data Center Boundary -->
+        <rect x="964" y="146" width="332" height="670" rx="12" fill="rgba(8, 51, 68, 0.18)" stroke="#22d3ee" stroke-width="2" stroke-dasharray="8,4" />
+        <text x="982" y="170" fill="#67e8f9" font-size="12" font-weight="700">On-Premises HQ (Taichung LAN)</text>
+
+        <!-- ========================================================= -->
+        <!-- LAYER 2: CONNECTION ARROWS (drawn BEFORE component boxes) -->
+        <!-- ========================================================= -->
+
+        <!-- 1. INGRESS: Cloudflare -> Firewall -> Nginx L7 -> Cloud Run -->
+        <path class="flow-path" data-flows="ingress" d="M 155 106 L 155 130 L 456 130 L 456 462" fill="none" stroke="#fb7185" stroke-width="2.2" marker-end="url(#arrow-rose)" />
+        <path class="flow-path" data-flows="ingress" d="M 346 508 L 298 508 L 298 256 L 288 256" fill="none" stroke="#fb7185" stroke-width="2.2" marker-end="url(#arrow-rose)" />
+
+        <!-- 2. SMTP PASSTHROUGH: Cloud Run -> Nginx L4 (:2525) -> Gmail SMTP Relay -->
+        <path class="flow-path" data-flows="smtp" d="M 288 276 L 304 276 L 304 422 L 760 422 L 760 462" fill="none" stroke="#34d399" stroke-width="2.2" marker-end="url(#arrow-emerald)" />
+        <path class="flow-path" data-flows="smtp" d="M 800 462 L 800 130 L 725 130 L 725 106" fill="none" stroke="#34d399" stroke-width="2.2" marker-end="url(#arrow-emerald)" />
+
+        <!-- 3. VPN TUNNEL: WireGuard wg0 <-> On-Prem UDM (UDP 51820) -->
+        <path class="flow-path" data-flows="vpn" d="M 604 654 L 948 654 L 948 252 L 986 252" fill="none" stroke="#fb923c" stroke-width="2.6" stroke-dasharray="7,4" marker-start="url(#arrow-orange-start)" marker-end="url(#arrow-orange)" />
+        <!-- On-Prem UDM -> DNS / ERP MSSQL / LAN -->
+        <path class="flow-path" data-flows="vpn control" d="M 1130 306 L 1130 342" fill="none" stroke="#22d3ee" stroke-width="1.8" marker-end="url(#arrow-cyan)" />
+        <path class="flow-path" data-flows="vpn" d="M 1010 306 L 1010 494 L 988 494" fill="none" stroke="#fb923c" stroke-width="1.8" />
+        <path class="flow-path" data-flows="vpn" d="M 976 280 L 976 498 L 988 498" fill="none" stroke="#fb923c" stroke-width="2" marker-end="url(#arrow-orange)" />
+        <path class="flow-path" data-flows="vpn" d="M 976 498 L 976 620 L 988 620" fill="none" stroke="#fb923c" stroke-width="2" marker-end="url(#arrow-orange)" />
+
+        <!-- 4. EGRESS NAT: Cloud Run (tagged) -> VPC Egress NAT -> On-Prem UDM IPv6 Allowlist / NAS -->
+        <path class="flow-path" data-flows="egress" d="M 288 296 L 296 296 L 296 766 L 760 766 L 760 744" fill="none" stroke="#fbbf24" stroke-width="2.2" marker-end="url(#arrow-amber)" />
+        <path class="flow-path" data-flows="egress" d="M 886 680 L 956 680 L 956 640 L 986 640" fill="none" stroke="#fbbf24" stroke-width="2.2" stroke-dasharray="5,3" marker-end="url(#arrow-amber)" />
+
+        <!-- 5. CONTROL PLANE: Cloud DNS -> WireGuard -> On-Prem DNS -->
+        <path class="flow-path" data-flows="control vpn" d="M 288 486 L 346 486 L 346 632" fill="none" stroke="#a78bfa" stroke-width="1.8" stroke-dasharray="4,3" marker-end="url(#arrow-violet)" />
+        <!-- Certbot -> Secret Manager & Let's Encrypt & GCS -->
+        <path class="flow-path" data-flows="control" d="M 628 708 L 288 708" fill="none" stroke="#a78bfa" stroke-width="1.8" stroke-dasharray="4,3" marker-end="url(#arrow-violet)" />
+        <path class="flow-path" data-flows="control" d="M 628 620 L 288 620" fill="none" stroke="#a78bfa" stroke-width="1.8" stroke-dasharray="4,3" marker-end="url(#arrow-violet)" />
+        <path class="flow-path" data-flows="control" d="M 660 584 L 660 404 L 420 404 L 420 106" fill="none" stroke="#a78bfa" stroke-width="1.8" stroke-dasharray="4,3" marker-end="url(#arrow-violet)" />
+        <!-- IaC Control Plane -> GCP / VM -->
+        <path class="flow-path" data-flows="control" d="M 1095 106 L 1095 130 L 892 130 L 892 388" fill="none" stroke="#cbd5e1" stroke-width="1.8" stroke-dasharray="4,3" marker-end="url(#arrow-slate)" />
+
+        <!-- ========================================================= -->
+        <!-- LAYER 3: TOP EXTERNAL / SAAS SERVICES (Non-GCP Rounded)   -->
+        <!-- ========================================================= -->
+
+        <!-- Cloudflare Edge -->
+        <g class="node-group" data-id="cloudflare">
+          <rect x="30" y="26" width="250" height="80" rx="8" fill="#0f172a" />
+          <rect class="node-frame" x="30" y="26" width="250" height="80" rx="8" fill="rgba(136, 19, 55, 0.45)" stroke="#fb7185" stroke-width="1.8" />
+          <text x="155" y="50" fill="#ffffff" font-size="12" font-weight="700" text-anchor="middle">Cloudflare Edge &amp; DNS</text>
+          <text x="155" y="68" fill="#fecdd3" font-size="9.5" text-anchor="middle">Orange Cloud Proxy (80/443 IPv4+IPv6)</text>
+          <text x="155" y="84" fill="#cbd5e1" font-size="9" text-anchor="middle">Dynamic IP Allowlist · DNS-01 Zone</text>
+        </g>
+
+        <!-- Let's Encrypt CA -->
+        <g class="node-group" data-id="letsencrypt">
+          <rect x="308" y="26" width="234" height="80" rx="8" fill="#0f172a" />
+          <rect class="node-frame" x="308" y="26" width="234" height="80" rx="8" fill="rgba(76, 29, 149, 0.45)" stroke="#a78bfa" stroke-width="1.8" />
+          <text x="425" y="50" fill="#ffffff" font-size="12" font-weight="700" text-anchor="middle">Let's Encrypt CA</text>
+          <text x="425" y="68" fill="#ddd6fe" font-size="9.5" text-anchor="middle">ACME DNS-01 Wildcard Certs</text>
+          <text x="425" y="84" fill="#cbd5e1" font-size="9" text-anchor="middle">*.j.com · *.staff · *.mail</text>
+        </g>
+
+        <!-- Google Workspace SMTP Relay -->
+        <g class="node-group" data-id="gmail_smtp">
+          <rect x="570" y="26" width="300" height="80" rx="8" fill="#0f172a" />
+          <rect class="node-frame" x="570" y="26" width="300" height="80" rx="8" fill="rgba(6, 78, 59, 0.45)" stroke="#34d399" stroke-width="1.8" />
+          <text x="720" y="50" fill="#ffffff" font-size="12" font-weight="700" text-anchor="middle">Google Workspace SMTP Relay</text>
+          <text x="720" y="68" fill="#a7f3d0" font-size="9.5" text-anchor="middle">smtp-relay.gmail.com:587 (STARTTLS)</text>
+          <text x="720" y="84" fill="#cbd5e1" font-size="9" text-anchor="middle">IP-Based Allowlist (VM Static IPv4)</text>
+        </g>
+
+        <!-- IaC & GitHub Control Plane -->
+        <g class="node-group" data-id="iac">
+          <rect x="898" y="26" width="398" height="80" rx="8" fill="#0f172a" />
+          <rect class="node-frame" x="898" y="26" width="398" height="80" rx="8" fill="rgba(30, 41, 59, 0.72)" stroke="#cbd5e1" stroke-width="1.8" />
+          <text x="1097" y="50" fill="#ffffff" font-size="12" font-weight="700" text-anchor="middle">IaC &amp; Config Management</text>
+          <text x="1097" y="68" fill="#e2e8f0" font-size="9.5" text-anchor="middle">Terraform (Shared VPC) · Ansible (manage_vm.yml Play 1–6)</text>
+          <text x="1097" y="84" fill="#94a3b8" font-size="9" text-anchor="middle">GitHub: jp/it-maintenance-scripts</text>
+        </g>
+
+        <!-- ========================================================= -->
+        <!-- LAYER 4: GCP LEFT COLUMN — SERVICE PROJECTS & PLATFORM    -->
+        <!-- ========================================================= -->
+
+        <!-- Service Projects / Cloud Run -->
+        <g class="node-group" data-id="cloud_run">
+          <rect x="44" y="196" width="244" height="122" rx="8" fill="#0f172a" />
+          <rect class="node-frame" x="44" y="196" width="244" height="122" rx="8" fill="rgba(6, 78, 59, 0.42)" stroke="#34d399" stroke-width="1.8" />
+          <foreignObject x="56" y="208" width="34" height="34">
+            <div xmlns="http://www.w3.org/1999/xhtml" class="gcp-icon-wrap">
+              <img src="gcp-svg-icons/Serverless Computing/SVG/ServerlessComputing-512-color.svg" alt="GCP Serverless Computing" />
+            </div>
+          </foreignObject>
+          <text x="100" y="222" fill="#ffffff" font-size="11.5" font-weight="700">Service Projects (Cloud Run)</text>
+          <text x="100" y="238" fill="#6ee7b7" font-size="9">Direct VPC Egress (3 Projects)</text>
+          <text x="56" y="260" fill="#e2e8f0" font-size="9">• j-staffportal-j-com</text>
+          <text x="56" y="275" fill="#e2e8f0" font-size="9">• j-website (pythonportal)</text>
+          <text x="56" y="290" fill="#e2e8f0" font-size="9">• j-XYerp-enhancement</text>
+          <text x="56" y="306" fill="#fde68a" font-size="8.5">Tag: egress-via-wireguard-gateway</text>
+        </g>
+
+        <!-- GKE Secondary Ranges -->
+        <g class="node-group" data-id="gke_ranges">
+          <rect x="44" y="338" width="244" height="78" rx="8" fill="#0f172a" />
+          <rect class="node-frame" x="44" y="338" width="244" height="78" rx="8" fill="rgba(8, 51, 68, 0.45)" stroke="#22d3ee" stroke-width="1.6" />
+          <foreignObject x="56" y="352" width="34" height="34">
+            <div xmlns="http://www.w3.org/1999/xhtml" class="gcp-icon-wrap">
+              <img src="gcp-svg-icons/Containers/SVG/Containers-512-color.svg" alt="GCP Containers GKE" />
+            </div>
+          </foreignObject>
+          <text x="100" y="366" fill="#ffffff" font-size="11.5" font-weight="700">GKE Secondary Ranges</text>
+          <text x="100" y="382" fill="#a5f3fc" font-size="9">gke-pods: 10.4.0.0/14</text>
+          <text x="100" y="397" fill="#a5f3fc" font-size="9">gke-services: 10.8.0.0/20</text>
+        </g>
+
+        <!-- Cloud DNS Private Forwarding -->
+        <g class="node-group" data-id="cloud_dns">
+          <rect x="44" y="436" width="244" height="96" rx="8" fill="#0f172a" />
+          <rect class="node-frame" x="44" y="436" width="244" height="96" rx="8" fill="rgba(76, 29, 149, 0.42)" stroke="#a78bfa" stroke-width="1.6" />
+          <foreignObject x="56" y="450" width="34" height="34">
+            <div xmlns="http://www.w3.org/1999/xhtml" class="gcp-icon-wrap">
+              <img src="gcp-svg-icons/Networking/SVG/Networking-512-color-rgb.svg" alt="GCP Cloud DNS" />
+            </div>
+          </foreignObject>
+          <text x="100" y="464" fill="#ffffff" font-size="11.5" font-weight="700">Cloud DNS Forwarding</text>
+          <text x="100" y="480" fill="#ddd6fe" font-size="9">Private Path (35.199.192.0/19)</text>
+          <text x="56" y="502" fill="#e2e8f0" font-size="9">Zones: j.internal. · staff.j.com.</text>
+          <text x="56" y="518" fill="#cbd5e1" font-size="9">Targets: 192.168.1.1 · 192.168.1.63</text>
+        </g>
+
+        <!-- Secret Manager & IAM -->
+        <g class="node-group" data-id="secret_manager">
+          <rect x="44" y="552" width="244" height="106" rx="8" fill="#0f172a" />
+          <rect class="node-frame" x="44" y="552" width="244" height="106" rx="8" fill="rgba(136, 19, 55, 0.42)" stroke="#fb7185" stroke-width="1.6" />
+          <foreignObject x="56" y="566" width="34" height="34">
+            <div xmlns="http://www.w3.org/1999/xhtml" class="gcp-icon-wrap">
+              <img src="gcp-svg-icons/Security Identity/SVG/SecurityIdentity-512-color.svg" alt="GCP Security Identity" />
+            </div>
+          </foreignObject>
+          <text x="100" y="580" fill="#ffffff" font-size="11.5" font-weight="700">Secret Manager &amp; IAM</text>
+          <text x="100" y="596" fill="#fecdd3" font-size="9">Per-Secret Least Privilege</text>
+          <text x="56" y="618" fill="#e2e8f0" font-size="8.8">• j-cloudflare-update-api-token</text>
+          <text x="56" y="633" fill="#e2e8f0" font-size="8.8">• auth_ldap_credentials</text>
+          <text x="56" y="648" fill="#e2e8f0" font-size="8.8">• erp-sql-server-manipulate-idpw</text>
+        </g>
+
+        <!-- Cloud Storage -->
+        <g class="node-group" data-id="gcs">
+          <rect x="44" y="678" width="244" height="90" rx="8" fill="#0f172a" />
+          <rect class="node-frame" x="44" y="678" width="244" height="90" rx="8" fill="rgba(120, 53, 15, 0.38)" stroke="#fbbf24" stroke-width="1.6" />
+          <foreignObject x="56" y="692" width="34" height="34">
+            <div xmlns="http://www.w3.org/1999/xhtml" class="gcp-icon-wrap">
+              <img src="gcp-svg-icons/Storage/SVG/Storage-512-color.svg" alt="GCP Cloud Storage" />
+            </div>
+          </foreignObject>
+          <text x="100" y="706" fill="#ffffff" font-size="11.5" font-weight="700">Cloud Storage (GCS)</text>
+          <text x="100" y="722" fill="#fde68a" font-size="9">State &amp; Cert Sync Buckets</text>
+          <text x="56" y="742" fill="#e2e8f0" font-size="8.8">• j-shared-vpc-host-tfstate</text>
+          <text x="56" y="757" fill="#e2e8f0" font-size="8.8">• gs://j-it-data/certbot (rsync)</text>
+        </g>
+
+        <!-- ========================================================= -->
+        <!-- LAYER 5: SHARED VPC SUBNETS, FIREWALL & GATEWAY VM        -->
+        <!-- ========================================================= -->
+
+        <!-- Subnets Row -->
+        <g class="node-group" data-id="vpc_us_west1">
+          <rect x="330" y="218" width="276" height="74" rx="8" fill="#0f172a" />
+          <rect class="node-frame" x="330" y="218" width="276" height="74" rx="8" fill="rgba(8, 51, 68, 0.48)" stroke="#22d3ee" stroke-width="1.6" />
+          <foreignObject x="342" y="232" width="32" height="32">
+            <div xmlns="http://www.w3.org/1999/xhtml" class="gcp-icon-wrap">
+              <img src="gcp-svg-icons/Networking/SVG/Networking-512-color-rgb.svg" alt="GCP VPC us-west1" />
+            </div>
+          </foreignObject>
+          <text x="384" y="244" fill="#ffffff" font-size="11" font-weight="700">VPC: us-west1-prod</text>
+          <text x="384" y="260" fill="#a5f3fc" font-size="9">10.138.0.0/20 (us-west1-prod-subnet)</text>
+          <text x="384" y="275" fill="#cbd5e1" font-size="8.5">IPv6: 2600:1900:4040:a52::/64</text>
+        </g>
+
+        <g class="node-group" data-id="vpc_asia_east1">
+          <rect x="624" y="218" width="276" height="74" rx="8" fill="#0f172a" />
+          <rect class="node-frame" x="624" y="218" width="276" height="74" rx="8" fill="rgba(8, 51, 68, 0.48)" stroke="#22d3ee" stroke-width="1.6" />
+          <foreignObject x="636" y="232" width="32" height="32">
+            <div xmlns="http://www.w3.org/1999/xhtml" class="gcp-icon-wrap">
+              <img src="gcp-svg-icons/Networking/SVG/Networking-512-color-rgb.svg" alt="GCP VPC asia-east1" />
+            </div>
+          </foreignObject>
+          <text x="678" y="244" fill="#ffffff" font-size="11" font-weight="700">VPC: asia-east1-prod</text>
+          <text x="678" y="260" fill="#a5f3fc" font-size="9">10.140.0.0/20 (asia-east1-prod-subnet)</text>
+          <text x="678" y="275" fill="#cbd5e1" font-size="8.5">IPv6: 2600:1900:4030:704b::/64</text>
+        </g>
+
+        <!-- VPC Firewall & Custom Routes Strip -->
+        <g class="node-group" data-id="firewall_routes">
+          <rect x="330" y="308" width="570" height="66" rx="8" fill="#0f172a" />
+          <rect class="node-frame" x="330" y="308" width="570" height="66" rx="8" fill="rgba(136, 19, 55, 0.25)" stroke="#fb7185" stroke-width="1.5" stroke-dasharray="5,3" />
+          <text x="346" y="328" fill="#fda4af" font-size="11" font-weight="700">VPC Firewall Rules &amp; Custom Routes (Dual-Stack)</text>
+          <text x="346" y="346" fill="#f1f5f9" font-size="9">FW: Cloudflare Edge (80/443) · WireGuard Egress (UDP 51820) · Internal All (admits :2525) · IAP SSH (35.235.240.0/20)</text>
+          <text x="346" y="362" fill="#fde68a" font-size="9">Routes: Prio 800 → On-Prem 192.168.{1,20,30,88}.0/24 | Prio 900 → 0.0.0.0/0 &amp; ::/0 (tag: egress-via-wireguard-gateway)</text>
+        </g>
+
+        <!-- WireGuard Gateway GCE VM Outer Box -->
+        <g class="node-group" data-id="gateway_vm">
+          <rect x="330" y="390" width="570" height="392" rx="10" fill="#0f172a" />
+          <rect class="node-frame" x="330" y="390" width="570" height="392" rx="10" fill="rgba(15, 23, 42, 0.85)" stroke="#fbbf24" stroke-width="2" />
+          <foreignObject x="344" y="402" width="36" height="36">
+            <div xmlns="http://www.w3.org/1999/xhtml" class="gcp-icon-wrap">
+              <img src="gcp-svg-icons/Compute/SVG/Compute-512-color.svg" alt="GCP Compute Engine" />
+            </div>
+          </foreignObject>
+          <text x="392" y="418" fill="#ffffff" font-size="12" font-weight="700">GCE VM: instance-wireguard-gateway-20260417</text>
+          <text x="392" y="435" fill="#fde68a" font-size="9.2">e2-micro · Debian 12 · us-west1-b · 10.138.0.3 · Static Ext IPv4 + IPv6 (/96) · can_ip_forward=true</text>
+        </g>
+
+        <!-- VM Internal 1: Nginx L7 Reverse Proxy (Non-GCP Rounded) -->
+        <g class="node-group" data-id="nginx_l7">
+          <rect x="346" y="462" width="258" height="104" rx="7" fill="#0f172a" />
+          <rect class="node-frame" x="346" y="462" width="258" height="104" rx="7" fill="rgba(136, 19, 55, 0.38)" stroke="#fb7185" stroke-width="1.6" />
+          <text x="475" y="484" fill="#ffffff" font-size="11.5" font-weight="700" text-anchor="middle">Nginx L7 Reverse Proxy</text>
+          <text x="475" y="502" fill="#fecdd3" font-size="9" text-anchor="middle">Dual-Stack :80 / :443 (TLS 1.2/1.3)</text>
+          <text x="475" y="518" fill="#e2e8f0" font-size="8.8" text-anchor="middle">staffportalbackend.j.com (LE Cert)</text>
+          <text x="475" y="534" fill="#e2e8f0" font-size="8.8" text-anchor="middle">Catch-all "_" (Self-Signed) · 300s Timeout</text>
+          <text x="475" y="551" fill="#94a3b8" font-size="8.5" text-anchor="middle">Ansible Play 4 · nginx_reverse_proxy.conf.j2</text>
+        </g>
+
+        <!-- VM Internal 2: Nginx L4 Stream Proxy (Non-GCP Rounded) -->
+        <g class="node-group" data-id="nginx_l4">
+          <rect x="626" y="462" width="258" height="104" rx="7" fill="#0f172a" />
+          <rect class="node-frame" x="626" y="462" width="258" height="104" rx="7" fill="rgba(6, 78, 59, 0.42)" stroke="#34d399" stroke-width="1.6" />
+          <text x="755" y="484" fill="#ffffff" font-size="11.5" font-weight="700" text-anchor="middle">Nginx L4 Stream Proxy</text>
+          <text x="755" y="502" fill="#a7f3d0" font-size="9" text-anchor="middle">libnginx-mod-stream · TCP :2525</text>
+          <text x="755" y="518" fill="#e2e8f0" font-size="8.8" text-anchor="middle">Opaque TCP Passthrough (No TLS Term.)</text>
+          <text x="755" y="534" fill="#e2e8f0" font-size="8.8" text-anchor="middle">DNS Resolver ipv6=off → Static IPv4 Egress</text>
+          <text x="755" y="551" fill="#94a3b8" font-size="8.5" text-anchor="middle">Ansible Play 5 · nginx_stream_proxy.conf.j2</text>
+        </g>
+
+        <!-- VM Internal 3: WireGuard wg0 & iptables/ip6tables (Non-GCP Rounded) -->
+        <g class="node-group" data-id="wireguard_wg0">
+          <rect x="346" y="586" width="258" height="178" rx="7" fill="#0f172a" />
+          <rect class="node-frame" x="346" y="586" width="258" height="178" rx="7" fill="rgba(251, 146, 60, 0.25)" stroke="#fb923c" stroke-width="1.8" />
+          <text x="475" y="608" fill="#ffffff" font-size="11.5" font-weight="700" text-anchor="middle">WireGuard Gateway (wg0)</text>
+          <text x="475" y="626" fill="#fed7aa" font-size="9" text-anchor="middle">192.168.88.6/32 · MTU 1380 · UDP 51820</text>
+          <text x="360" y="648" fill="#f1f5f9" font-size="8.8">• iptables MASQUERADE (ens4 &amp; wg0)</text>
+          <text x="360" y="665" fill="#f1f5f9" font-size="8.8">• Cloud DNS 35.199.192.0/19 MASQ</text>
+          <text x="360" y="682" fill="#f1f5f9" font-size="8.8">• TCP :1433 DNAT → 192.168.1.38:1433</text>
+          <text x="360" y="699" fill="#f1f5f9" font-size="8.8">• wg0_ip6tables.sh (IPv6 FWD + TCPMSS)</text>
+          <text x="360" y="716" fill="#f1f5f9" font-size="8.8">• maintain_vpn_connection.service</text>
+          <text x="360" y="732" fill="#cbd5e1" font-size="8.3">  (Ping 192.168.1.1 auto-recovery)</text>
+          <text x="475" y="752" fill="#fdba74" font-size="8.5" text-anchor="middle">wireguard_forwarding.service</text>
+        </g>
+
+        <!-- VM Internal 4: VPC Egress NAT & Certbot (Non-GCP Rounded) -->
+        <g class="node-group" data-id="egress_certbot">
+          <rect x="626" y="586" width="258" height="178" rx="7" fill="#0f172a" />
+          <rect class="node-frame" x="626" y="586" width="258" height="178" rx="7" fill="rgba(120, 53, 15, 0.35)" stroke="#fbbf24" stroke-width="1.6" />
+          <text x="755" y="608" fill="#ffffff" font-size="11.5" font-weight="700" text-anchor="middle">VPC Egress NAT &amp; Certbot</text>
+          <text x="755" y="626" fill="#fde68a" font-size="9" text-anchor="middle">Independent of wg0 Lifecycle</text>
+          <text x="640" y="648" fill="#f1f5f9" font-size="8.8">• vpc_egress_nat.service (Play 6)</text>
+          <text x="640" y="665" fill="#f1f5f9" font-size="8.8">• IPv4 MASQ (10.138.0.0/20 → ens4)</text>
+          <text x="640" y="682" fill="#f1f5f9" font-size="8.8">• IPv6 SNAT (a52::/64 → Fixed /128)</text>
+          <text x="640" y="699" fill="#f1f5f9" font-size="8.8">• sysctl accept_ra=2 + forwarding=1</text>
+          <text x="640" y="716" fill="#ddd6fe" font-size="8.8">• certbot_renewal.service (DNS-01)</text>
+          <text x="640" y="732" fill="#cbd5e1" font-size="8.3">  Reloads Nginx + rsync → GCS</text>
+          <text x="755" y="752" fill="#94a3b8" font-size="8.5" text-anchor="middle">j-dnsmasq.conf (j.internal)</text>
+        </g>
+
+        <!-- ========================================================= -->
+        <!-- LAYER 6: ON-PREMISES COMPONENTS (Non-GCP Rounded Boxes)   -->
+        <!-- ========================================================= -->
+
+        <!-- UniFi UDM Gateway -->
+        <g class="node-group" data-id="udm">
+          <rect x="986" y="196" width="288" height="110" rx="8" fill="#0f172a" />
+          <rect class="node-frame" x="986" y="196" width="288" height="110" rx="8" fill="rgba(251, 146, 60, 0.25)" stroke="#fb923c" stroke-width="1.8" />
+          <text x="1130" y="220" fill="#ffffff" font-size="12" font-weight="700" text-anchor="middle">UniFi UDM Gateway</text>
+          <text x="1130" y="238" fill="#fed7aa" font-size="9.5" text-anchor="middle">WireGuard Peer · internalf.j.com:51820</text>
+          <text x="1130" y="256" fill="#e2e8f0" font-size="9" text-anchor="middle">Tunnel Subnet: 192.168.88.0/24</text>
+          <text x="1130" y="274" fill="#fde68a" font-size="9" text-anchor="middle">IPv6 Firewall Allowlist: Gateway VM /128</text>
+          <text x="1130" y="292" fill="#94a3b8" font-size="8.5" text-anchor="middle">Site-to-Site Hybrid Entry &amp; Edge Router</text>
+        </g>
+
+        <!-- On-Premises DNS Servers -->
+        <g class="node-group" data-id="onprem_dns">
+          <rect x="986" y="342" width="288" height="86" rx="8" fill="#0f172a" />
+          <rect class="node-frame" x="986" y="342" width="288" height="86" rx="8" fill="rgba(76, 29, 149, 0.4)" stroke="#a78bfa" stroke-width="1.6" />
+          <text x="1130" y="366" fill="#ffffff" font-size="11.5" font-weight="700" text-anchor="middle">On-Premises DNS Servers</text>
+          <text x="1130" y="384" fill="#ddd6fe" font-size="9.5" text-anchor="middle">192.168.1.1 · 192.168.1.63</text>
+          <text x="1130" y="402" fill="#e2e8f0" font-size="9" text-anchor="middle">Authoritative: j.internal. / staff.j.com.</text>
+        </g>
+
+        <!-- ERP MSSQL Server -->
+        <g class="node-group" data-id="erp_mssql">
+          <rect x="986" y="454" width="288" height="90" rx="8" fill="#0f172a" />
+          <rect class="node-frame" x="986" y="454" width="288" height="90" rx="8" fill="rgba(76, 29, 149, 0.42)" stroke="#a78bfa" stroke-width="1.6" />
+          <text x="1130" y="478" fill="#ffffff" font-size="11.5" font-weight="700" text-anchor="middle">ERP MSSQL Database Server</text>
+          <text x="1130" y="496" fill="#ddd6fe" font-size="9.5" text-anchor="middle">192.168.1.38 : TCP 1433</text>
+          <text x="1130" y="514" fill="#e2e8f0" font-size="9" text-anchor="middle">Reached via Gateway DNAT / WireGuard</text>
+          <text x="1130" y="530" fill="#94a3b8" font-size="8.5" text-anchor="middle">Credentials in Host Project Secret Manager</text>
+        </g>
+
+        <!-- Synology NAS & LAN Subnets -->
+        <g class="node-group" data-id="onprem_nas">
+          <rect x="986" y="570" width="288" height="106" rx="8" fill="#0f172a" />
+          <rect class="node-frame" x="986" y="570" width="288" height="106" rx="8" fill="rgba(8, 51, 68, 0.45)" stroke="#22d3ee" stroke-width="1.6" />
+          <text x="1130" y="594" fill="#ffffff" font-size="11.5" font-weight="700" text-anchor="middle">Synology NAS &amp; LAN Subnets</text>
+          <text x="1130" y="612" fill="#a5f3fc" font-size="9" text-anchor="middle">192.168.1.0/24 · .20.0/24 · .30.0/24 · .88.0/24</text>
+          <text x="1130" y="630" fill="#fde68a" font-size="9" text-anchor="middle">Public IPv6 (AAAA) via Gateway SNAT /128</text>
+          <text x="1130" y="648" fill="#cbd5e1" font-size="8.5" text-anchor="middle">Private LAN reachable via WireGuard wg0</text>
+        </g>
+
+        <!-- On-Premises Automation & LDAP -->
+        <g class="node-group" data-id="onprem_scripts">
+          <rect x="986" y="700" width="288" height="90" rx="8" fill="#0f172a" />
+          <rect class="node-frame" x="986" y="700" width="288" height="90" rx="8" fill="rgba(30, 41, 59, 0.72)" stroke="#94a3b8" stroke-width="1.6" />
+          <text x="1130" y="724" fill="#ffffff" font-size="11.5" font-weight="700" text-anchor="middle">On-Premises Ops &amp; LDAP</text>
+          <text x="1130" y="742" fill="#e2e8f0" font-size="9" text-anchor="middle">update_dns_record_waf_gpcfirewall.ps1</text>
+          <text x="1130" y="758" fill="#cbd5e1" font-size="8.8" text-anchor="middle">SA: j-update-ip-dns-firewall (securityAdmin)</text>
+          <text x="1130" y="774" fill="#94a3b8" font-size="8.5" text-anchor="middle">LDAP / LDAPS Auth for Staff Portal</text>
+        </g>
+
+        <!-- ========================================================= -->
+        <!-- LAYER 7: EDGE LABELS (with dark pill backgrounds)         -->
+        <!-- ========================================================= -->
+        <g class="flow-label-group" data-flows="ingress">
+          <rect x="206" y="118" width="166" height="20" rx="4" fill="#0f172a" stroke="#fb7185" stroke-width="1" />
+          <text x="289" y="131" fill="#fecdd3" font-size="8.5" font-weight="600" text-anchor="middle">HTTPS 80/443 (CF Edge)</text>
+        </g>
+
+        <g class="flow-label-group" data-flows="smtp">
+          <rect x="652" y="118" width="150" height="20" rx="4" fill="#0f172a" stroke="#34d399" stroke-width="1" />
+          <text x="727" y="131" fill="#a7f3d0" font-size="8.5" font-weight="600" text-anchor="middle">SMTP :587 (Static IPv4)</text>
+        </g>
+
+        <g class="flow-label-group" data-flows="vpn">
+          <rect x="868" y="220" width="110" height="22" rx="4" fill="#0f172a" stroke="#fb923c" stroke-width="1.2" />
+          <text x="923" y="234" fill="#fed7aa" font-size="8.5" font-weight="700" text-anchor="middle">WG UDP :51820</text>
+        </g>
+
+        <g class="flow-label-group" data-flows="egress">
+          <rect x="876" y="692" width="102" height="22" rx="4" fill="#0f172a" stroke="#fbbf24" stroke-width="1.2" />
+          <text x="927" y="706" fill="#fde68a" font-size="8.5" font-weight="700" text-anchor="middle">SNAT IPv6 /128</text>
+        </g>
+
+        <!-- ========================================================= -->
+        <!-- LAYER 8: LEGEND (Cleanly OUTSIDE all boundary boxes)      -->
+        <!-- Lowest boundary ends at y=816 -> Legend starts at y=838   -->
+        <!-- ========================================================= -->
+        <rect x="24" y="838" width="1272" height="64" rx="10" fill="#0b1224" stroke="#334155" stroke-width="1.2" />
+        <text x="42" y="859" fill="#94a3b8" font-size="10" font-weight="700">LEGEND</text>
+
+        <!-- Row 1: Line Types -->
+        <line x1="110" y1="855" x2="146" y2="855" stroke="#fb7185" stroke-width="2.2" />
+        <text x="154" y="859" fill="#f1f5f9" font-size="9.5">Cloudflare → Nginx L7 Ingress</text>
+
+        <line x1="348" y1="855" x2="384" y2="855" stroke="#34d399" stroke-width="2.2" />
+        <text x="392" y="859" fill="#f1f5f9" font-size="9.5">Nginx L4 SMTP (:2525 → :587)</text>
+
+        <line x1="590" y1="855" x2="626" y2="855" stroke="#fb923c" stroke-width="2.4" stroke-dasharray="6,3" />
+        <text x="634" y="859" fill="#f1f5f9" font-size="9.5">WireGuard VPN Tunnel (wg0)</text>
+
+        <line x1="820" y1="855" x2="856" y2="855" stroke="#fbbf24" stroke-width="2.2" stroke-dasharray="4,2" />
+        <text x="864" y="859" fill="#f1f5f9" font-size="9.5">Tagged Egress NAT (IPv4/IPv6)</text>
+
+        <line x1="1064" y1="855" x2="1100" y2="855" stroke="#a78bfa" stroke-width="2" stroke-dasharray="3,3" />
+        <text x="1108" y="859" fill="#f1f5f9" font-size="9.5">DNS / Secrets / Certbot</text>
+
+        <!-- Row 2: Component Conventions -->
+        <rect x="110" y="874" width="16" height="16" rx="3" fill="#ffffff" stroke="#38bdf8" stroke-width="1" />
+        <text x="134" y="886" fill="#cbd5e1" font-size="9.5">GCP 服務（引用 gcp-svg-icons 相對路徑 SVG）</text>
+
+        <rect x="430" y="874" width="22" height="16" rx="4" fill="rgba(30, 41, 59, 0.8)" stroke="#cbd5e1" stroke-width="1.2" />
+        <text x="460" y="886" fill="#cbd5e1" font-size="9.5">獨立 / 地端元件（圓角方框＋文字，非 GCP/AWS）</text>
+
+        <text x="820" y="886" fill="#94a3b8" font-size="9.5">💡 點擊圖中任意元件可檢視詳細組態；點擊上方膠囊可過濾特定流量路徑</text>
+      </svg>
+    </div>
+
+    <!-- Interactive Node Inspector -->
+    <div class="inspector" id="node-inspector">
+      <div class="inspector-main">
+        <div class="inspector-title" id="inspector-title">點擊上方架構圖中的任意元件以檢視詳細規格</div>
+        <div class="inspector-desc" id="inspector-desc">
+          本架構以 GCP Shared VPC Host Project 為網路中樞，透過單一台雙堆疊 WireGuard Gateway VM（<code>instance-wireguard-gateway-20260417</code>）同時承擔 Site-to-Site VPN、Nginx L7 反向代理、Nginx L4 SMTP 透傳代理、Cloud Run 固定 IPv4/IPv6 出網 NAT 以及自動化 Certbot 憑證管理。
+        </div>
+        <div class="inspector-tags" id="inspector-tags">
+          <span class="inspector-tag">Dual-Stack IPv4/IPv6</span>
+          <span class="inspector-tag">Shared VPC</span>
+          <span class="inspector-tag">WireGuard wg0</span>
+          <span class="inspector-tag">Nginx L7 + L4 Stream</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="cards-grid">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-dot amber"></div>
+          <h3>1. Shared VPC 與雙堆疊路由</h3>
+        </div>
+        <ul>
+          <li>• <strong>跨區雙 VPC</strong>：<code>us-west1-prod</code>（<code>10.138.0.0/20</code>）與 <code>asia-east1-prod</code>（<code>10.140.0.0/20</code>）均啟用 Standard Tier External IPv6。</li>
+          <li>• <strong>三個 Service Projects</strong>：Staff Portal、Website 與 ERP Enhancement 透過 Direct VPC Egress 共享子網路與 DNS 轉發。</li>
+          <li>• <strong>分流路由</strong>：Priority 800 導向地端 <code>192.168.x.0/24</code>；Priority 900 將標記 <code>egress-via-wireguard-gateway</code> 的全網流量導經 Gateway NAT。</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-dot emerald"></div>
+          <h3>2. WireGuard Gateway 與 Nginx 雙代理</h3>
+        </div>
+        <ul>
+          <li>• <strong>Nginx L7 反向代理（Play 4）</strong>：雙堆疊監聽 80/443，終止 TLS 1.2/1.3 並提供 300s 逾時保護，代理至 Cloud Run Staff Portal。</li>
+          <li>• <strong>Nginx L4 Stream 透傳（Play 5）</strong>：監聽內網 <code>10.138.0.3:2525</code>，強制 IPv4 出口透傳至 <code>smtp-relay.gmail.com:587</code>，保留端對端 STARTTLS。</li>
+          <li>• <strong>隧道與出網解耦</strong>：<code>vpc_egress_nat.service</code> 獨立於 <code>wg0</code> 運行，確保隧道重啟不中斷 Cloud Run 固定 IPv4/IPv6 出網。</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-dot rose"></div>
+          <h3>3. 安全邊界、憑證與 IaC 維運</h3>
+        </div>
+        <ul>
+          <li>• <strong>動態 Cloudflare 白名單</strong>：Terraform 即時抓取 Cloudflare IPv4/IPv6 CIDR，並以 <code>cloudflare-origin</code> 標籤限縮暴露範圍。</li>
+          <li>• <strong>最小權限密鑰管理</strong>：Secret Manager 依單一 Secret 授權；Certbot 透過 DNS-01 自動續簽萬用憑證並同步備份至 GCS。</li>
+          <li>• <strong>自動復原與版本化</strong>：<code>maintain_vpn_connection.service</code> 監控 <code>192.168.1.1</code> 自動重連；所有組態由 Terraform 與 Ansible Play 1–6 冪等部署。</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer">
+      <span>Generated from jp/it-maintenance-scripts (main)</span>
+      <span>Icons: gcp-svg-icons/* (relative paths) · Independent nodes rendered as rounded boxes</span>
+    </div>
+  </div>
+
+  <script>
+    // Node Inspector Metadata
+    const NODE_DETAILS = {
+      cloudflare: {
+        title: "Cloudflare Edge & DNS (Orange Cloud / DNS-01)",
+        desc: "所有對外公開的代理網域（如 staffportalbackend.j.com）皆透過 Cloudflare Edge 進入。Terraform 6.10 透過 http data source 動態拉取 cloudflare.com/ips-v4 與 ips-v6 並驗證 CIDR，僅放行 TCP 80/443 給具 cloudflare-origin 標籤的 Gateway VM；同時提供 DNS-01 驗證供 Certbot 簽發萬用憑證。",
+        tags: ["TCP 80/443", "Dynamic IPv4+IPv6 CIDR", "DNS-01 ACME"]
+      },
+      letsencrypt: {
+        title: "Let's Encrypt CA (ACME DNS-01)",
+        desc: "由 Gateway VM 上的 certbot_renewal.service 透過 Cloudflare DNS-01 挑戰自動簽發與續簽萬用憑證（j.com、*.j.com、*.staff.j.com、*.mail.j.com），到期前 30 天自動更新並觸發 Nginx reload。",
+        tags: ["renew_before_expiry = 30d", "Wildcard Certs", "Auto Nginx Reload"]
+      },
+      gmail_smtp: {
+        title: "Google Workspace SMTP Relay (smtp-relay.gmail.com:587)",
+        desc: "授權機制依賴連線來源的靜態 IPv4 白名單。Nginx L4 Stream Proxy 設定 resolver ipv6=off 強制以 Gateway VM 靜態 IPv4 撥出，並維持端對端 STARTTLS（VM 上不解密、不存放憑證）。",
+        tags: ["TCP 587", "E2E STARTTLS", "Static IPv4 Allowlist"]
+      },
+      iac: {
+        title: "IaC & Config Management (Terraform + Ansible + GitHub)",
+        desc: "Terraform (terraform/j-shared-vpc) 佈建 GCP 專案、Shared VPC、防火牆、路由、Cloud DNS、Secret Manager 與 GCE VM；Ansible (ansible/j-shared-vpc-wireguard-gateway/manage_vm.yml) 以 6 個 Play 冪等配置套件、SSH、Git 腳本、Nginx L7/L4、IPv6 轉發與 NAT。",
+        tags: ["Terraform GCS Backend", "Ansible Play 1-6", "GitHub Repo"]
+      },
+      cloud_run: {
+        title: "Attached Service Projects & Cloud Run (Direct VPC Egress)",
+        desc: "包含 j-staffportal-j-com、j-website（pythonportal）與 j-XYerp-enhancement。透過 Direct VPC Egress 接入 us-west1-prod-subnet，可呼叫 10.138.0.3:2525 寄信、經 wg0 存取地端 ERP/LDAP，或掛載 egress-via-wireguard-gateway 標籤以固定 IPv4/IPv6 出網。",
+        tags: ["3 Service Projects", "Direct VPC Egress", "j-staff-portal", "pythonportal"]
+      },
+      gke_ranges: {
+        title: "GKE Secondary IP Ranges (us-west1-prod-subnet)",
+        desc: "在 us-west1-prod-subnet 上預留 gke-pods (10.4.0.0/14) 與 gke-services (10.8.0.0/20) 次要網段，並納入 internal_ipv4_ranges 防火牆規則，同時授予 GKE Service Agent roles/container.hostServiceAgentUser。",
+        tags: ["10.4.0.0/14", "10.8.0.0/20", "Shared VPC GKE"]
+      },
+      cloud_dns: {
+        title: "Cloud DNS Private Forwarding Zones",
+        desc: "為 j.internal. 與 staff.j.com. 建立私有轉發區，綁定 us-west1-prod 與 asia-east1-prod 雙 VPC。查詢來源 35.199.192.0/19 經 Gateway VM MASQUERADE 後，透過 WireGuard 轉發至地端 DNS 192.168.1.1 與 192.168.1.63。",
+        tags: ["35.199.192.0/19", "Private Forwarding", "192.168.1.1 / .63"]
+      },
+      secret_manager: {
+        title: "Secret Manager & Least-Privilege IAM",
+        desc: "Terraform 僅管理 Secret 容器與單一 Secret 級別的 secretAccessor 授權（不將明文寫入 tfstate）。包含 j-cloudflare-update-api-token、auth_ldap_credentials 與 erp-sql-server-manipulate-idpw。",
+        tags: ["Per-Secret IAM", "No Cleartext in State", "wireguard-gateway-sa"]
+      },
+      gcs: {
+        title: "Google Cloud Storage (Terraform State & Certbot Sync)",
+        desc: "j-shared-vpc-host-tfstate 儲存並鎖定 Terraform 遠端狀態；gs://j-it-data/certbot 由 certbot_get_certificates_keys.sh 透過 gcloud storage rsync (--no-ignore-symlinks) 同步備份憑證。",
+        tags: ["Object Versioning", "GCS Locking", "Certbot rsync"]
+      },
+      vpc_us_west1: {
+        title: "Shared VPC: us-west1-prod",
+        desc: "主要營運網路，包含 us-west1-prod-subnet (10.138.0.0/20，External Standard Tier IPv6 2600:1900:4040:a52::/64)。承載 WireGuard Gateway VM (10.138.0.3)、Cloud Run Direct VPC Egress 與 GKE 次要網段，並設定 lifecycle prevent_destroy = true 保護 IPv6 Tier。",
+        tags: ["10.138.0.0/20", "Standard Tier IPv6", "prevent_destroy"]
+      },
+      vpc_asia_east1: {
+        title: "Shared VPC: asia-east1-prod",
+        desc: "台灣區網路，包含 asia-east1-prod-subnet (10.140.0.0/20，External Standard Tier IPv6 2600:1900:4030:704b::/64)。套用一致的雙堆疊防火牆規則、地端 192.168.x.0/24 路由與 Cloud DNS 私有轉發區。",
+        tags: ["10.140.0.0/20", "asia-east1", "Dual-Stack"]
+      },
+      firewall_routes: {
+        title: "VPC Firewall Policies & Custom Routes",
+        desc: "所有防火牆規則皆依 IPv4 / IPv6 分拆建立：含動態 Cloudflare Edge 80/443、WireGuard UDP 51820、內網與地端全協定互通（開放 :2525 而不暴露於外網郵件規則）、IAP SSH (35.235.240.0/20)、LB Health Checks 與 Google Workspace Mail Ports。",
+        tags: ["Prio 800 On-Prem", "Prio 900 Tagged NAT", "Port 2525 Internal-Only"]
+      },
+      gateway_vm: {
+        title: "GCE VM: instance-wireguard-gateway-20260417",
+        desc: "部署於 us-west1-b 的 e2-micro (Debian 12, 30GB pd-standard)，啟用 can_ip_forward = true 與 cloudflare-origin 標籤。具備內網固定 IP 10.138.0.3 及 Standard Tier 靜態外部 IPv4 / IPv6 (/96)，綁定 wireguard-gateway-sa。",
+        tags: ["e2-micro", "10.138.0.3", "Static IPv4+IPv6", "can_ip_forward"]
+      },
+      nginx_l7: {
+        title: "Nginx L7 HTTP/HTTPS Reverse Proxy (Ansible Play 4)",
+        desc: "雙堆疊監聽 80/443，啟用 TLS 1.2/1.3 與 proxy_ssl_server_name on，並將 connect/send/read timeout 設為 300s 以容忍 Cloud Run 冷啟動。依 Host 轉發 staffportalbackend.j.com（Let's Encrypt 憑證）與預設 Catch-all（自簽憑證）至 Cloud Run。",
+        tags: ["TLS 1.2/1.3", "300s Cold-Start Budget", "Dual-Stack [::]"]
+      },
+      nginx_l4: {
+        title: "Nginx L4 Stream Proxy — SMTP Passthrough (Ansible Play 5)",
+        desc: "使用 libnginx-mod-stream 監聽雙堆疊 Port 2525，透過 map + resolver (8.8.8.8 / 1.1.1.1, valid=300s, ipv6=off) 動態解析並以 IPv4 透傳至 smtp-relay.gmail.com:587。Port 2525 不在 mail-server-service-ports 中，僅允許內網存取。",
+        tags: ["Port 2525", "L4 Opaque TCP", "ipv6=off", "600s Session"]
+      },
+      wireguard_wg0: {
+        title: "WireGuard Tunnel (wg0) & Watchdog",
+        desc: "介面 192.168.88.6/32 (MTU 1380) 連線至 internalf.j.com:51820。PostUp 設定 iptables MASQUERADE、Cloud DNS 35.199.192.0/19 偽裝、TCP 1433 DNAT → 192.168.1.38:1433 與 TCPMSS 鉗制；systemd drop-in 掛載 wg0_ip6tables.sh；maintain_vpn_connection.service 持續監控 192.168.1.1 自動復原。",
+        tags: ["MTU 1380", "1433 DNAT → ERP", "Auto-Recovery Watchdog"]
+      },
+      egress_certbot: {
+        title: "VPC Egress NAT Service & Certbot Automation",
+        desc: "Play 6 部署 vpc_egress_nat.service（獨立於 wg0），設定 net.ipv6.conf.ens4.accept_ra=2 保留 GCE 預設路由，對 10.138.0.0/20 執行 IPv4 MASQUERADE、對 2600:1900:4040:a52::/64 執行 IPv6 SNAT 至固定 /128。同時由 certbot_renewal.service 自動更新憑證並 rsync 至 GCS。",
+        tags: ["accept_ra=2", "IPv6 SNAT /128", "Certbot → GCS"]
+      },
+      udm: {
+        title: "On-Premises UniFi UDM Gateway (WireGuard Peer)",
+        desc: "地端邊界路由器與 WireGuard 伺服器（internalf.j.com:51820），負責終結混合雲 VPN 隧道（192.168.88.0/24）並於防火牆白名單放行 GCP Gateway VM 的固定外部 IPv6 /128。",
+        tags: ["UDP 51820", "IPv6 /128 Allowlist", "Site-to-Site Peer"]
+      },
+      onprem_dns: {
+        title: "On-Premises DNS Servers (192.168.1.1 / 192.168.1.63)",
+        desc: "負責解析內部網域 j.internal. 與 staff.j.com.，同時作為 GCP Cloud DNS Private Forwarding Zone 與 wg0.conf 的目標名稱伺服器。",
+        tags: ["192.168.1.1", "192.168.1.63", "Internal DNS"]
+      },
+      erp_mssql: {
+        title: "On-Premises ERP MSSQL Server (192.168.1.38:1433)",
+        desc: "地端核心 ERP 資料庫。GCP 雲端服務（如 Staff Portal、DocRecog）可透過 WireGuard 隧道或 Gateway VM 的 TCP 1433 DNAT 規則存取，連線帳密集中託管於 Host Project 的 Secret Manager。",
+        tags: ["192.168.1.38:1433", "Gateway DNAT", "Secret Manager Auth"]
+      },
+      onprem_nas: {
+        title: "Synology NAS & On-Premises LAN Subnets",
+        desc: "涵蓋 192.168.1.0/24、192.168.20.0/24、192.168.30.0/24、192.168.88.0/24。內網流量經 WireGuard 路由；NAS 公網 IPv6 (AAAA) 則由標記 egress-via-wireguard-gateway 的 Cloud Run 經 Gateway IPv6 SNAT /128 存取。",
+        tags: ["4 LAN Subnets", "NAS IPv6 AAAA", "Hybrid Access"]
+      },
+      onprem_scripts: {
+        title: "On-Premises Ops Scripts & LDAP",
+        desc: "update_dns_record_waf_gpcfirewall.ps1 以 j-update-ip-dns-firewall SA 讀取 Host Project 的 Cloudflare API Token 並維護 GCP 防火牆（roles/compute.securityAdmin）；地端 LDAP 提供 Staff Portal 驗證。",
+        tags: ["securityAdmin", "Cloudflare Sync", "LDAP/LDAPS"]
+      }
+    };
+
+    // Interactive Node Selection
+    const svg = document.getElementById("arch-svg");
+    const inspectorTitle = document.getElementById("inspector-title");
+    const inspectorDesc = document.getElementById("inspector-desc");
+    const inspectorTags = document.getElementById("inspector-tags");
+
+    document.querySelectorAll(".node-group").forEach(node => {
+      node.addEventListener("click", () => {
+        document.querySelectorAll(".node-group.selected").forEach(el => el.classList.remove("selected"));
+        node.classList.add("selected");
+        const data = NODE_DETAILS[node.dataset.id];
+        if (!data) return;
+        inspectorTitle.textContent = data.title;
+        inspectorDesc.textContent = data.desc;
+        inspectorTags.innerHTML = data.tags.map(t => `<span class="inspector-tag">${t}</span>`).join("");
+      });
+    });
+
+    // Interactive Flow Filtering
+    document.querySelectorAll(".filter-pill").forEach(pill => {
+      pill.addEventListener("click", () => {
+        document.querySelectorAll(".filter-pill").forEach(p => p.classList.remove("active"));
+        pill.classList.add("active");
+        const flow = pill.dataset.flow;
+
+        if (flow === "all") {
+          svg.classList.remove("filtering");
+          document.querySelectorAll(".flow-match").forEach(el => el.classList.remove("flow-match"));
+          return;
+        }
+
+        svg.classList.add("filtering");
+        document.querySelectorAll(".flow-path, .flow-label-group").forEach(el => {
+          const flows = (el.dataset.flows || "").split(" ");
+          el.classList.toggle("flow-match", flows.includes(flow));
+        });
+      });
+    });
+
+    // Built-in Export Toolbar (architecture-diagram skill)
+    function toggleToolbar() {
+      document.getElementById("export-toolbar").classList.toggle("open");
+    }
+
+    async function captureDiagram() {
+      const el = document.getElementById("report-container");
+      const rect = el.getBoundingClientRect();
+      const pad = 32;
+      return html2canvas(document.body, {
+        backgroundColor: "#020617",
+        scale: 2,
+        useCORS: true,
+        x: Math.max(0, rect.left + window.scrollX - pad),
+        y: Math.max(0, rect.top + window.scrollY - pad),
+        width: rect.width + pad * 2,
+        height: rect.height + pad * 2,
+        ignoreElements: node => node.id === "export-toolbar"
+      });
+    }
+
+    async function copyAsImage() {
+      try {
+        const canvas = await captureDiagram();
+        canvas.toBlob(async blob => {
+          await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+          alert("已複製高解析度 PNG 架構圖至剪貼簿！");
+        });
+      } catch (err) {
+        alert("無法寫入剪貼簿（需 HTTPS 或 localhost 環境），請改用 PNG 下載。");
+      }
+    }
+
+    async function downloadPNG() {
+      const canvas = await captureDiagram();
+      const link = document.createElement("a");
+      link.download = "j-hybrid-cloud-architecture.png";
+      link.href = canvas.toDataURL("image/png");
+      link.click();
+    }
+
+    async function downloadPDF() {
+      const canvas = await captureDiagram();
+      const imgData = canvas.toDataURL("image/png");
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF({
+        orientation: canvas.width > canvas.height ? "landscape" : "portrait",
+        unit: "px",
+        format: [canvas.width / 2, canvas.height / 2]
+      });
+      pdf.addImage(imgData, "PNG", 0, 0, canvas.width / 2, canvas.height / 2);
+      pdf.save("j-hybrid-cloud-architecture.pdf");
+    }
+  </script>
+</body>
+</html>
